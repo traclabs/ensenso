@@ -5,8 +5,14 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
+        - /l_raw1
+        - /l_rect1
+        - /r_raw1
+        - /r_rect1
+        - /cloud1
+        - /cloud1/Autocompute Value Bounds1
       Splitter Ratio: 0.617834
-    Tree Height: 313
+    Tree Height: 299
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -56,59 +62,63 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /camera/left/image_raw
+      Image Topic: /ensenso/left/image_raw
       Max Value: 1
       Median window: 5
       Min Value: 0
       Name: l_raw
       Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
+      Queue Size: 1
+      Transport Hint: compressed
+      Unreliable: true
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /camera/left/image_rect
+      Image Topic: /ensenso/left/image_rect
       Max Value: 1
       Median window: 5
       Min Value: 0
       Name: l_rect
       Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
+      Queue Size: 1
+      Transport Hint: compressed
+      Unreliable: false
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /camera/right/image_raw
+      Image Topic: /ensenso/right/image_raw
       Max Value: 1
       Median window: 5
       Min Value: 0
       Name: r_raw
       Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
+      Queue Size: 1
+      Transport Hint: compressed
+      Unreliable: false
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /camera/right/image_rect
+      Image Topic: /ensenso/right/image_rect
       Max Value: 1
       Median window: 5
       Min Value: 0
       Name: r_rect
       Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
+      Queue Size: 1
+      Transport Hint: compressed
+      Unreliable: false
       Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
+        Max Value: 1.5
+        Min Value: 0.5
+        Value: false
       Axis: Z
       Channel Name: intensity
       Class: rviz/PointCloud2
       Color: 255; 255; 255
-      Color Transformer: Intensity
+      Color Transformer: AxisColor
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false
@@ -118,22 +128,15 @@ Visualization Manager:
       Min Intensity: 0
       Name: cloud
       Position Transformer: XYZ
-      Queue Size: 10
+      Queue Size: 1
       Selectable: true
       Size (Pixels): 1
       Size (m): 0.01
       Style: Points
-      Topic: /camera/depth/points
+      Topic: /ensenso/depth/points
+      Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: visualization_marker
-      Name: Marker
-      Namespaces:
-        {}
-      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
@@ -171,18 +174,18 @@ Visualization Manager:
         Z: 0.888107
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: -1.0198
+      Pitch: -0.244797
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.55501
+      Yaw: 2.73
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1056
+  Height: 1028
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000019c00000396fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000028000001c8000000dd00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a006c005f00720061007701000001f6000000de0000001600fffffffb0000000c006c005f007200650063007401000002da000000e40000001600ffffff000000010000013100000396fc0200000005fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730100000028000001f5000000b000fffffffb0000000a0072005f0072006100770100000223000000cb0000001600fffffffb0000000c0072005f007200650063007401000002f4000000ca0000001600fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073f0000003efc0100000002fb0000000800540069006d006501000000000000073f000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000004660000039600000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000016a0000037afc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000028000001ba000000dd00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a006c005f00720061007701000001e8000000d70000001600fffffffb0000000c006c005f007200650063007401000002c5000000dd0000001600ffffff00000001000001310000037afc0200000005fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730100000028000001e6000000b000fffffffb0000000a0072005f0072006100770100000214000000c40000001600fffffffb0000000c0072005f007200650063007401000002de000000c40000001600fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073f0000003efc0100000002fb0000000800540069006d006501000000000000073f000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000004980000037a00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -192,8 +195,8 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1855
-  X: 65
-  Y: 24
+  X: 55
+  Y: 14
   l_raw:
     collapsed: false
   l_rect:
