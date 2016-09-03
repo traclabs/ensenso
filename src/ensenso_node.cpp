@@ -20,7 +20,6 @@
 #include <opencv2/highgui/highgui.hpp>
 
 // PCL headers
-#include <pcl/common/colors.h>
 #include <pcl/common/transforms.h>
 
 // Ensenso grabber

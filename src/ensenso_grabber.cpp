@@ -149,7 +149,7 @@ void pcl::EnsensoGrabber::start ()
   if (!device_open_)
     openDevice (0);
 
-  frequency_.reset ();
+  times_.clear();
   running_ = true;
   grabber_thread_ = boost::thread (&pcl::EnsensoGrabber::processGrabbing, this);
 }
@@ -578,7 +578,10 @@ bool pcl::EnsensoGrabber::setExtrinsicCalibration (const Eigen::Affine3d &transf
 float pcl::EnsensoGrabber::getFramesPerSecond () const
 {
   boost::mutex::scoped_lock lock (fps_mutex_);
-  return (frequency_.getFrequency ());
+  if (times_.size () < 2)
+    return (0.0);
+  return ((times_.size () - 1) /
+          (times_.back () - times_.front ()));
 }
 
 bool pcl::EnsensoGrabber::openTcpPort (const int port)
@@ -975,7 +978,9 @@ void pcl::EnsensoGrabber::processGrabbing ()
         boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
         boost::shared_ptr<PairOfImages> rectifiedimages (new PairOfImages);
         fps_mutex_.lock ();
-        frequency_.event ();
+        times_.push_back(ros::Time::now().toSec());
+        if (times_.size() > 30)
+          times_.pop_front();
         fps_mutex_.unlock ();
         
         NxLibCommand (cmdCapture).execute ();

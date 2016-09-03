@@ -17,6 +17,7 @@
 #include <camera_info_manager/camera_info_manager.h>
 
 #include <nxLib.h> // Ensenso SDK
+#include <deque>
 
 namespace pcl
 {
@@ -438,7 +439,7 @@ protected:
     bool running_;
 
     /** @brief Point cloud capture/processing frequency */
-    pcl::EventFrequency frequency_;
+    std::deque<double> times_;
 
     /** @brief Mutual exclusion for FPS computation */
     mutable boost::mutex fps_mutex_;
