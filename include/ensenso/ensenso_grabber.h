@@ -435,6 +435,9 @@ protected:
     /** @brief Whether an TCP port is opened or not */
     bool tcp_open_;
 
+    /** @brief The serial number used to open the camera */
+    std::string serial_;
+
     /** @brief Whether an Ensenso device is running or not */
     bool running_;
 

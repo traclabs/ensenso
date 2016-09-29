@@ -96,23 +96,35 @@ bool pcl::EnsensoGrabber::openDevice (std::string serial_no)
   if (device_open_)
     PCL_THROW_EXCEPTION (pcl::IOException, "Cannot open multiple devices!");
   PCL_INFO ("Opening Ensenso stereo camera S/N: %s\n", serial_no.c_str());
-  try
-  {
-    // Create a pointer referencing the camera's tree item, for easier access:
-    camera_ = (*root_)[itmCameras][itmBySerialNo][serial_no];
 
-    if (!camera_.exists () || camera_[itmType] != valStereo)
-    {
-      PCL_THROW_EXCEPTION (pcl::IOException, "Please connect a single stereo camera to your computer!");
-    }
-
-    NxLibCommand open (cmdOpen);
-    open.parameters ()[itmCameras] = camera_[itmSerialNumber].asString ();
-    open.execute ();
+  ros::Time start_time = ros::Time::now();
+  bool isOpen = false;
+  NxLibException exception("None",0);
+  while (!isOpen && ros::Time::now()-start_time < ros::Duration(5.0)) {
+    try
+      {
+        // Create a pointer referencing the camera's tree item, for easier access:
+        camera_ = (*root_)[itmCameras][itmBySerialNo][serial_no];
+        
+        if (!camera_.exists () || camera_[itmType] != valStereo)
+          {
+            PCL_THROW_EXCEPTION (pcl::IOException, "Please connect a single stereo camera to your computer!");
+          }
+        
+        NxLibCommand open (cmdOpen);
+        open.parameters ()[itmCameras] = camera_[itmSerialNumber].asString ();
+        open.execute ();
+        serial_=serial_no;
+        isOpen=true;
+      }
+    catch (NxLibException &ex)
+      {
+        exception = ex;
+      }
   }
-  catch (NxLibException &ex)
-  {
-    ensensoExceptionHandling (ex, "openDevice");
+  
+  if (!isOpen) {
+    ensensoExceptionHandling (exception, "openDevice");
     return (false);
   }
 
@@ -213,6 +225,29 @@ bool pcl::EnsensoGrabber::configureCapture (const bool auto_exposure,
     captureParams[itmTargetBrightness].set (target_brightness);
     captureParams[itmTriggerMode].set (trigger_mode);
     captureParams[itmUseDisparityMapAreaOfInterest].set (use_disparity_map_area_of_interest);
+
+   
+    int minDisp = -134;
+    int numDisps = 256;
+
+    NxLibItem stereoMatching = camera_[itmParameters][itmDisparityMap][itmStereoMatching];
+ 
+    stereoMatching[itmMinimumDisparity] = minDisp; // set minimum disparity to desired value
+    stereoMatching[itmNumberOfDisparities] = numDisps; // set number of disparity to desired value
+
+    // NxLibCommand (cmdCapture).execute ();
+
+    // NxLibCommand estimateDisaritySettings(cmdEstimateDisparitySettings);
+    // estimateDisaritySettings.execute();
+
+    // minDisp = estimateDisaritySettings.result()[serial_][itmMinimumDisparity].asInt();
+    // numDisps = estimateDisaritySettings.result()[serial_][itmNumberOfDisparities].asInt();
+ 
+    // ROS_INFO_STREAM("Ensenso firmware thinks good minimum/number of disparities are: "<<minDisp<<" & "<<numDisps);
+
+    // stereoMatching[itmMinimumDisparity] = minDisp; // set minimum disparity to desired value
+    // stereoMatching[itmNumberOfDisparities] = numDisps; // set number of disparity to desired value
+
   }
   catch (NxLibException &ex)
   {
