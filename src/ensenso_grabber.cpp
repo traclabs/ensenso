@@ -227,13 +227,13 @@ bool pcl::EnsensoGrabber::configureCapture (const bool auto_exposure,
     captureParams[itmUseDisparityMapAreaOfInterest].set (use_disparity_map_area_of_interest);
 
    
-    int minDisp = -134;
-    int numDisps = 256;
+    //    int minDisp = -134;
+    //    int numDisps = 256;
 
-    NxLibItem stereoMatching = camera_[itmParameters][itmDisparityMap][itmStereoMatching];
+    //    NxLibItem stereoMatching = camera_[itmParameters][itmDisparityMap][itmStereoMatching];
  
-    stereoMatching[itmMinimumDisparity] = minDisp; // set minimum disparity to desired value
-    stereoMatching[itmNumberOfDisparities] = numDisps; // set number of disparity to desired value
+    //    stereoMatching[itmMinimumDisparity] = minDisp; // set minimum disparity to desired value
+    //    stereoMatching[itmNumberOfDisparities] = numDisps; // set number of disparity to desired value
 
     // NxLibCommand (cmdCapture).execute ();
 
