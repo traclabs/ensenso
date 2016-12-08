@@ -17,10 +17,11 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 find_package(Boost REQUIRED COMPONENTS system filesystem thread)
-find_package(Eigen REQUIRED)
 find_package(PCL REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(pkg_ensenso REQUIRED ensenso-nxlib)
+pkg_check_modules(Eigen REQUIRED eigen3)
+
 
 add_service_files(
   FILES
