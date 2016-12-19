@@ -73,3 +73,4 @@ target_link_libraries(ensenso_grabber ${PCL_LIBRARIES} ${catkin_LIBRARIES} ${pkg
 add_executable(ensenso_node src/ensenso_node.cpp)
 add_dependencies(ensenso_node ${catkin_EXPORTED_TARGETS})
 target_link_libraries(ensenso_node ensenso_grabber ${PCL_LIBRARIES} ${catkin_LIBRARIES} ${pkg_ensenso_LIBRARIES})
+add_dependencies(ensenso_node ensenso_generate_messages_cpp)
