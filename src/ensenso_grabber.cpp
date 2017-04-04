@@ -25,8 +25,7 @@ pcl::EnsensoGrabber::EnsensoGrabber () :
   tcp_open_ (false),
   running_ (false)
 {
-  point_cloud_signal_ = createSignal<sig_cb_ensenso_point_cloud> ();
-  images_signal_ = createSignal<sig_cb_ensenso_images> ();
+  raw_images_signal_ = createSignal<sig_cb_ensenso_raw_images> ();
   point_cloud_images_signal_ = createSignal<sig_cb_ensenso_point_cloud_images> ();
   PCL_INFO ("Initialising nxLib\n");
 
@@ -49,8 +48,7 @@ pcl::EnsensoGrabber::~EnsensoGrabber () throw ()
     stop ();
     root_.reset ();
 
-    disconnect_all_slots<sig_cb_ensenso_point_cloud> ();
-    disconnect_all_slots<sig_cb_ensenso_images> ();
+    disconnect_all_slots<sig_cb_ensenso_raw_images> ();
     disconnect_all_slots<sig_cb_ensenso_point_cloud_images> ();
 
     if (tcp_open_)
@@ -163,7 +161,9 @@ void pcl::EnsensoGrabber::start ()
 
   times_.clear();
   running_ = true;
-  grabber_thread_ = boost::thread (&pcl::EnsensoGrabber::processGrabbing, this);
+  raw_initialized_=false;
+  raw_thread_ = boost::thread (&pcl::EnsensoGrabber::processRaw, this);
+  points_thread_ = boost::thread (&pcl::EnsensoGrabber::processPoints, this);
 }
 
 void pcl::EnsensoGrabber::stop ()
@@ -171,7 +171,8 @@ void pcl::EnsensoGrabber::stop ()
   if (running_)
   {
     running_ = false;  // Stop processGrabbing () callback
-    grabber_thread_.join ();
+    raw_thread_.join ();
+    points_thread_.join ();
   }
 }
 
@@ -262,8 +263,8 @@ bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud
   if (!device_open_)
     return (false);
 
-  if (running_)
-    return (false);
+  //  if (running_)
+  //    return (false);
 
   try
   {
@@ -999,103 +1000,99 @@ std::string pcl::EnsensoGrabber::getOpenCVType (const int channels,
   return (boost::str (boost::format ("CV_%i%cC%i") % bits % type % channels));
 }
 
-void pcl::EnsensoGrabber::processGrabbing ()
+void pcl::EnsensoGrabber::processRaw ()
 {
+  NxLibCommand capture(cmdCapture, "raw");
+
+  ros::Rate loop_rate(3);
+  
   bool continue_grabbing = running_;
+
   while (continue_grabbing)
   {
     try
     {
-      // Publish cloud / images
-      if (num_slots<sig_cb_ensenso_point_cloud> () > 0 || num_slots<sig_cb_ensenso_images> () > 0 || num_slots<sig_cb_ensenso_point_cloud_images> () > 0)
-      {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
         boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
-        boost::shared_ptr<PairOfImages> rectifiedimages (new PairOfImages);
-        fps_mutex_.lock ();
-        times_.push_back(ros::Time::now().toSec());
-        if (times_.size() > 30)
-          times_.pop_front();
-        fps_mutex_.unlock ();
         
-        NxLibCommand (cmdCapture).execute ();
-        double timestamp;
-        camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
-
-        // Gather images
-        if (num_slots<sig_cb_ensenso_images> () > 0 || num_slots<sig_cb_ensenso_point_cloud_images> () > 0)
-        {
-          // Rectify images
-          NxLibCommand (cmdRectifyImages).execute ();
-          int width, height, channels, bpe;
-          bool isFlt, collected_pattern = false;
+        capture.execute();
+        raw_initialized_=true;
+        
+        if (num_slots<sig_cb_ensenso_raw_images>()>0) {
           
-          try  // Try to collect calibration pattern, if not possible, publish RAW images and Rectified images instead
-          {
-            NxLibCommand collect_pattern (cmdCollectPattern);
-            collect_pattern.parameters ()[itmBuffer].set (false);  // Do NOT store the pattern into the buffer!
-            collect_pattern.execute ();
-            collected_pattern = true;
-          }
-          catch (const NxLibException &ex)
-          {
-            // We failed to collect the pattern but the RAW images are available!
-          }
-
-          if (collected_pattern)
-          {
-            camera_[itmImages][itmWithOverlay][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
-            rawimages->first.header.stamp = rawimages->second.header.stamp = getPCLStamp (timestamp);
-            rawimages->first.width = rawimages->second.width = width;
-            rawimages->first.height = rawimages->second.height = height;
-            rawimages->first.data.resize (width * height * sizeof(float));
-            rawimages->second.data.resize (width * height * sizeof(float));
-            rawimages->first.encoding = rawimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
-            camera_[itmImages][itmWithOverlay][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
-            camera_[itmImages][itmWithOverlay][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
-            // rectifiedimages
-            camera_[itmImages][itmRectified][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
-            rectifiedimages->first.width = rectifiedimages->second.width = width;
-            rectifiedimages->first.height = rectifiedimages->second.height = height;
-            rectifiedimages->first.data.resize (width * height * sizeof(float));
-            rectifiedimages->second.data.resize (width * height * sizeof(float));
-            rectifiedimages->first.encoding = rectifiedimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
-            camera_[itmImages][itmRectified][itmLeft].getBinaryData (rectifiedimages->first.data.data (), rectifiedimages->first.data.size (), 0, 0);
-            camera_[itmImages][itmRectified][itmRight].getBinaryData (rectifiedimages->second.data.data (), rectifiedimages->second.data.size (), 0, 0);
-          }
-          else
-          {
-            camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
-            rawimages->first.header.stamp = rawimages->second.header.stamp = getPCLStamp (timestamp);
-            rawimages->first.width = rawimages->second.width = width;
-            rawimages->first.height = rawimages->second.height = height;
-            rawimages->first.data.resize (width * height * sizeof(float));
-            rawimages->second.data.resize (width * height * sizeof(float));
-            rawimages->first.encoding = rawimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
-            camera_[itmImages][itmRaw][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
-            camera_[itmImages][itmRaw][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
-            // rectifiedimages
-            camera_[itmImages][itmRectified][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
-            rectifiedimages->first.width = rectifiedimages->second.width = width;
-            rectifiedimages->first.height = rectifiedimages->second.height = height;
-            rectifiedimages->first.data.resize (width * height * sizeof(float));
-            rectifiedimages->second.data.resize (width * height * sizeof(float));
-            rectifiedimages->first.encoding = rectifiedimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
-            camera_[itmImages][itmRectified][itmLeft].getBinaryData (rectifiedimages->first.data.data (), rectifiedimages->first.data.size (), 0, 0);
-            camera_[itmImages][itmRectified][itmRight].getBinaryData (rectifiedimages->second.data.data (), rectifiedimages->second.data.size (), 0, 0);
-          }
+          int width, height, channels, bpe;
+          bool isFlt;
+          
+          double timestamp;
+          camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+          
+          camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+          rawimages->first.header.stamp = rawimages->second.header.stamp = getPCLStamp (timestamp);
+          rawimages->first.width = rawimages->second.width = width;
+          rawimages->first.height = rawimages->second.height = height;
+          rawimages->first.data.resize (width * height * sizeof(float));
+          rawimages->second.data.resize (width * height * sizeof(float));
+          rawimages->first.encoding = rawimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
+          camera_[itmImages][itmRaw][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
+          camera_[itmImages][itmRaw][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
+          raw_images_signal_->operator () (rawimages);
         }
+    }
+    catch (NxLibException &ex)
+      {
+        ensensoExceptionHandling (ex, "processRaw");
+      }
+    loop_rate.sleep();
+    continue_grabbing = running_;
+  }
+}
 
-        // Gather point cloud
-        if (num_slots<sig_cb_ensenso_point_cloud> () > 0 || num_slots<sig_cb_ensenso_point_cloud_images> () > 0)
-        {
-          // Stereo matching task
-          NxLibCommand (cmdComputeDisparityMap).execute ();
-          // Convert disparity map into XYZ data for each pixel
-          NxLibCommand (cmdComputePointMap).execute ();
-          // Get info about the computed point map and copy it into a std::vector
+void pcl::EnsensoGrabber::processPoints ()
+{
+
+  NxLibCommand disparity(cmdComputeDisparityMap, "points");
+  NxLibCommand points(cmdComputePointMap, "points");
+  
+  ros::Rate loop_rate(2);
+  
+  bool continue_grabbing = running_;
+ 
+  while (continue_grabbing)
+  {
+    if (!raw_initialized_) {
+      continue_grabbing = running_;
+      continue;
+    }
+    
+    try
+    {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+        boost::shared_ptr<PairOfImages> rectifiedimages (new PairOfImages);
+
+        int width, height, channels, bpe;
+        bool isFlt;
+        double timestamp;
+
+        disparity.execute();
+        points.execute();
+        
+        if (num_slots<sig_cb_ensenso_point_cloud_images>() > 0) {
+          
+          camera_[itmImages][itmPointMap].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);  // Get raw image timestamp
+          
+          rectifiedimages->first.header.stamp = rectifiedimages->second.header.stamp = getPCLStamp (timestamp);
+          // rectifiedimages
+          camera_[itmImages][itmRectified][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+          
+          rectifiedimages->first.width = rectifiedimages->second.width = width;
+          rectifiedimages->first.height = rectifiedimages->second.height = height;
+          rectifiedimages->first.data.resize (width * height * sizeof(float));
+          rectifiedimages->second.data.resize (width * height * sizeof(float));
+          rectifiedimages->first.encoding = rectifiedimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
+          
+          camera_[itmImages][itmRectified][itmLeft].getBinaryData (rectifiedimages->first.data.data (), rectifiedimages->first.data.size (), 0, 0);
+          camera_[itmImages][itmRectified][itmRight].getBinaryData (rectifiedimages->second.data.data (), rectifiedimages->second.data.size (), 0, 0);
+
           std::vector<float> pointMap;
-          int width, height;
           camera_[itmImages][itmPointMap].getBinaryDataInfo (&width, &height, 0, 0, 0, 0);
           camera_[itmImages][itmPointMap].getBinaryData (pointMap, 0);
           // Copy point cloud and convert in meters
@@ -1111,20 +1108,25 @@ void pcl::EnsensoGrabber::processGrabbing ()
             cloud->points[i / 3].y = pointMap[i + 1] / 1000.0;
             cloud->points[i / 3].z = pointMap[i + 2] / 1000.0;
           }
+    
+          point_cloud_images_signal_->operator () (cloud, rectifiedimages);
         }
-        // Publish signals
-        if (num_slots<sig_cb_ensenso_point_cloud_images> () > 0)
-          point_cloud_images_signal_->operator () (cloud, rawimages, rectifiedimages);
-        else if (num_slots<sig_cb_ensenso_point_cloud> () > 0)
-          point_cloud_signal_->operator () (cloud);
-        else if (num_slots<sig_cb_ensenso_images> () > 0)
-          images_signal_->operator () (rawimages,rectifiedimages);
-      }
-      continue_grabbing = running_;
+        
+        fps_mutex_.lock ();
+        times_.push_back(ros::Time::now().toSec());
+        if (times_.size() > 30)
+          times_.pop_front();
+        fps_mutex_.unlock ();
+        
+        
     }
     catch (NxLibException &ex)
-    {
-      ensensoExceptionHandling (ex, "processGrabbing");
-    }
+      {
+        ensensoExceptionHandling (ex, "processPoints");
+      }
+
+    loop_rate.sleep();
+    
+    continue_grabbing = running_;
   }
 }

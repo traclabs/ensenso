@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_srvs
   tf_conversions
   image_transport
+  sensor_msgs
 )
 
 find_package(Boost REQUIRED COMPONENTS system filesystem thread)
@@ -32,12 +33,14 @@ add_service_files(
   InitCalibration.srv
   Lights.srv
   SetBool.srv
+  GetPC.srv
 )
 
 generate_messages(
   DEPENDENCIES
   geometry_msgs
   std_msgs
+  sensor_msgs
 )
 
 catkin_package(

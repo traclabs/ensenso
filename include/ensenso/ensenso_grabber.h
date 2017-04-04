@@ -40,15 +40,15 @@ public:
     typedef boost::shared_ptr<const EnsensoGrabber> ConstPtr;
 
     // Define callback signature typedefs
-    typedef void
-    (sig_cb_ensenso_point_cloud)(const pcl::PointCloud<pcl::PointXYZ>::Ptr &);
+    //    typedef void 
+    //    (sig_cb_ensenso_point_cloud)(const pcl::PointCloud<pcl::PointXYZ>::Ptr &); 
 
     typedef void
-    (sig_cb_ensenso_images)(const boost::shared_ptr<PairOfImages> &,const boost::shared_ptr<PairOfImages> &);
+    (sig_cb_ensenso_raw_images)(const boost::shared_ptr<PairOfImages> &);
 
     typedef void
     (sig_cb_ensenso_point_cloud_images)(const pcl::PointCloud<pcl::PointXYZ>::Ptr &,
-                                        const boost::shared_ptr<PairOfImages> &,const boost::shared_ptr<PairOfImages> &);
+                                        const boost::shared_ptr<PairOfImages> &);
     /** @endcond */
 
     /** @brief Constructor */
@@ -118,7 +118,7 @@ public:
                       const bool gain_boost = false,
                       const bool hardware_gamma = true,
                       const bool hdr = false,
-                      const int pixel_clock = 43,
+                      const int pixel_clock = 24,
                       const bool projector = true,
                       const int target_brightness = 210,
                       const std::string trigger_mode = "Software",
@@ -418,13 +418,13 @@ public:
 
 protected:
     /** @brief Grabber thread */
-    boost::thread grabber_thread_;
+    boost::thread raw_thread_, points_thread_;
 
     /** @brief Boost point cloud signal */
-    boost::signals2::signal<sig_cb_ensenso_point_cloud>* point_cloud_signal_;
+    //    boost::signals2::signal<sig_cb_ensenso_point_cloud>* point_cloud_signal_;
 
     /** @brief Boost images signal */
-    boost::signals2::signal<sig_cb_ensenso_images>* images_signal_;
+    boost::signals2::signal<sig_cb_ensenso_raw_images>* raw_images_signal_;
 
     /** @brief Boost images + point cloud signal */
     boost::signals2::signal<sig_cb_ensenso_point_cloud_images>* point_cloud_images_signal_;
@@ -470,8 +470,10 @@ protected:
     /** @brief Continuously asks for images and or point clouds data from the device and publishes them if available.
      * PCL time stamps are filled for both the images and clouds grabbed (see @ref getPCLStamp)
      * @note The cloud time stamp is the RAW image time stamp */
-    void
-    processGrabbing ();
+    void processRaw ();
+    void processPoints ();
+
+    bool raw_initialized_;
 };
 }  // namespace pcl
 
