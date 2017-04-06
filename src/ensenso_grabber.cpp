@@ -98,34 +98,41 @@ bool pcl::EnsensoGrabber::openDevice (std::string serial_no)
   ros::Time start_time = ros::Time::now();
   bool isOpen = false;
   NxLibException exception("None",0);
-  while (!isOpen && ros::Time::now()-start_time < ros::Duration(5.0)) {
-    try
-      {
-        // Create a pointer referencing the camera's tree item, for easier access:
-        camera_ = (*root_)[itmCameras][itmBySerialNo][serial_no];
+  try
+    {
+      // Create a pointer referencing the camera's tree item, for easier access:
+      camera_ = (*root_)[itmCameras][itmBySerialNo][serial_no];
         
-        if (!camera_.exists () || camera_[itmType] != valStereo)
-          {
-            PCL_THROW_EXCEPTION (pcl::IOException, "Please connect a single stereo camera to your computer!");
-          }
-        
+      if (!camera_.exists () || camera_[itmType] != valStereo)
+        {
+          PCL_THROW_EXCEPTION (pcl::IOException, "Please connect a single stereo camera to your computer!");
+        }
+
+      while (!camera_[itmStatus][itmAvailable].asBool()) {
+        ROS_WARN_STREAM_THROTTLE(1,"Camera "<<serial_no<<" exists but is not available.  Trying again.");
+      }
+      
+      do {
         NxLibCommand open (cmdOpen);
         open.parameters ()[itmCameras] = camera_[itmSerialNumber].asString ();
         open.execute ();
         serial_=serial_no;
-        isOpen=true;
-      }
-    catch (NxLibException &ex)
-      {
-        exception = ex;
-      }
-  }
+        isOpen=camera_[itmStatus][itmOpen].asBool();
+        if (!isOpen)
+          ROS_WARN_STREAM_THROTTLE(1,"Having trouble opening camera "<<serial_no<<".  Trying again.");
+      } while (!isOpen);
+    }
+  catch (NxLibException &ex)
+    {
+      exception = ex;
+    }
   
   if (!isOpen) {
     ensensoExceptionHandling (exception, "openDevice");
     return (false);
   }
 
+  ROS_INFO_STREAM("Camera "<<serial_no<<" ready for use");
   device_open_ = true;
   return (true);
 }
@@ -191,7 +198,8 @@ std::string pcl::EnsensoGrabber::getName () const
   return ("EnsensoGrabber");
 }
 
-bool pcl::EnsensoGrabber::configureCapture (const bool auto_exposure,
+bool pcl::EnsensoGrabber::configureCapture(const uint flexview,
+                                           const bool auto_exposure,
                       const bool auto_gain,
                       const int bining,
                       const float exposure,
@@ -212,6 +220,7 @@ bool pcl::EnsensoGrabber::configureCapture (const bool auto_exposure,
   try
   {
     NxLibItem captureParams = camera_[itmParameters][itmCapture];
+    captureParams[itmFlexView].set ((int)flexview);
     captureParams[itmAutoExposure].set (auto_exposure);
     captureParams[itmAutoGain].set (auto_gain);
     captureParams[itmBinning].set (bining);
@@ -228,16 +237,29 @@ bool pcl::EnsensoGrabber::configureCapture (const bool auto_exposure,
     captureParams[itmUseDisparityMapAreaOfInterest].set (use_disparity_map_area_of_interest);
 
    
-    //    int minDisp = -134;
-    //    int numDisps = 256;
+    int minDisp = -41;  //Max distance: 1.5m
+    int numDisps = 96; //Min distance: 0.63m 
 
-    //    NxLibItem stereoMatching = camera_[itmParameters][itmDisparityMap][itmStereoMatching];
+    NxLibItem stereoMatching = camera_[itmParameters][itmDisparityMap][itmStereoMatching];
  
-    //    stereoMatching[itmMinimumDisparity] = minDisp; // set minimum disparity to desired value
-    //    stereoMatching[itmNumberOfDisparities] = numDisps; // set number of disparity to desired value
+    stereoMatching[itmMinimumDisparity] = minDisp; // set minimum disparity to desired value
+    stereoMatching[itmNumberOfDisparities] = numDisps; // set number of disparity to desired value
+    stereoMatching[itmShadowingThreshold] = 2; // I think
 
-    // NxLibCommand (cmdCapture).execute ();
 
+    NxLibItem postProcessing = camera_[itmParameters][itmDisparityMap][itmPostProcessing];
+
+    postProcessing[itmUniquenessRatio]=0;
+
+    postProcessing[itmMedianFilterRadius]=2; // Not sure about this
+    
+    postProcessing[itmSpeckleRemoval][itmComponentThreshold]=1;
+    postProcessing[itmSpeckleRemoval][itmRegionSize]=1000;
+
+    postProcessing[itmFilling][itmRegionSize]=0; //off
+
+    //    NxLibCommand (cmdCapture).execute ();
+    
     // NxLibCommand estimateDisaritySettings(cmdEstimateDisparitySettings);
     // estimateDisaritySettings.execute();
 
@@ -314,12 +336,12 @@ bool pcl::EnsensoGrabber::initExtrinsicCalibration (const double grid_spacing) c
   {
     if (!clearCalibrationPatternBuffer ())
       return (false);
-    (*root_)[itmParameters][itmPattern][itmGridSpacing].set (grid_spacing);  // GridSize can't be changed, it's protected in the tree
+    (*root_)[itmParameters][itmPattern][itmGridSpacing].set (grid_spacing);
+    // GridSize can't be changed, it's protected in the tree
     // With the speckle projector on it is nearly impossible to recognize the pattern
     // (the 3D calibration is based on stereo images, not on 3D depth map)
     
     // Most important parameters are: projector=off, front_light=on
-    configureCapture (true, true, 1, 0.32, true, 1, false, false, false, 10, false, 80, "Software", false);
   }
   catch (NxLibException &ex)
   {
@@ -359,6 +381,30 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
   try
   {
     NxLibCommand (cmdCapture).execute ();
+
+    if (num_slots<sig_cb_ensenso_raw_images>()>0) {
+
+      boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
+      
+      int width, height, channels, bpe;
+      bool isFlt;
+      
+      double timestamp;
+      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+      
+      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      rawimages->first.header.stamp = rawimages->second.header.stamp = getPCLStamp (timestamp);
+      rawimages->first.width = rawimages->second.width = width;
+      rawimages->first.height = rawimages->second.height = height;
+      rawimages->first.data.resize (width * height * sizeof(float));
+      rawimages->second.data.resize (width * height * sizeof(float));
+      rawimages->first.encoding = rawimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
+      camera_[itmImages][itmRaw][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
+      camera_[itmImages][itmRaw][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
+      raw_images_signal_->operator () (rawimages);
+    }
+
+
     NxLibCommand collect_pattern (cmdCollectPattern);
     collect_pattern.parameters ()[itmBuffer].set (true);  // Store the pattern into the buffer
     collect_pattern.execute ();
@@ -372,7 +418,7 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
   return ( (*root_)[itmParameters][itmPatternCount].asInt ());
 }
 
-bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, const bool average) const
+bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, const bool average) 
 {
   if (!device_open_)
     return (false);
@@ -384,9 +430,23 @@ bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &patte
   {
     NxLibCommand estimate_pattern_pose (cmdEstimatePatternPose);
     estimate_pattern_pose.parameters ()[itmAverage].set (average);
-    
+
+    int num_items = (*root_)[itmParameters][itmPatternCount].asInt ();
+
+    double err;
+    // if (num_items==1) {
+    //   checkCalibration(err);
+    //   estimate_pattern_pose.parameters ()[itmRecalibrate].set (true);
+    // }
+    // else
+    estimate_pattern_pose.parameters ()[itmRecalibrate].set (false);
+
     estimate_pattern_pose.execute ();
-    NxLibItem tf = estimate_pattern_pose.result ()[itmPatternPose];
+
+    // if (num_items==1) 
+    //   checkCalibration(err);
+
+    NxLibItem tf = estimate_pattern_pose.result ()[itmPatterns][num_items-1][itmPatternPose];
     // Convert tf into a matrix
     if (!jsonTransformationToMatrix (tf.asJson (), pattern_pose))
       return (false);
@@ -408,11 +468,18 @@ bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Aff
                           const std::string target,
                           const Eigen::Affine3d &guess_tf,
                           const bool pretty_format
-                          ) const
+                          ) 
 {
   if ( (*root_)[itmVersion][itmMajor] < 2 && (*root_)[itmVersion][itmMinor] < 3)
     PCL_WARN ("EnsensoSDK 1.3.x fixes bugs into extrinsic calibration matrix optimization, please update your SDK!\n"
           "http://www.ensenso.de/support/sdk-download/\n");
+
+  int num_items = (*root_)[itmParameters][itmPatternCount].asInt ();
+
+  if (num_items != robot_poses.size()) {
+    ROS_WARN("Number of robot poses not equal to collected images");
+    return false;
+  }
   
   NxLibCommand calibrate (cmdCalibrateHandEye);
   try
@@ -471,6 +538,9 @@ bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Aff
 
     calibrate.execute ();  // Might take up to 120 sec (maximum allowed by Ensenso API)
 
+
+    setExtrinsicCalibration(target);
+
     if (calibrate.successful())
     {
       json = calibrate.result()[itmLink].asJson (pretty_format);
@@ -503,13 +573,14 @@ bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Aff
   }
 }
 
+
 bool pcl::EnsensoGrabber::storeEEPROMExtrinsicCalibration () const
 {
   try
   {
     NxLibCommand store (cmdStoreCalibration);
-    store.execute ();
-    return (true);
+    //    store.execute ();
+    return (false);
   }
   catch (NxLibException &ex)
   {
@@ -517,6 +588,154 @@ bool pcl::EnsensoGrabber::storeEEPROMExtrinsicCalibration () const
     return (false);
   }
 }
+
+bool pcl::EnsensoGrabber::getCalInfo () 
+{
+
+  ROS_WARN_STREAM("Calibration info for camera: "<<serial_);
+
+  ROS_INFO("Dynamic->Stereo->Left->Camera: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmDynamic][itmStereo][itmLeft][itmCamera][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+  ROS_INFO("Dynamic->Stereo->Left->Rotation: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmDynamic][itmStereo][itmLeft][itmRotation][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+    ROS_INFO("Dynamic->Stereo->Right->Camera: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmDynamic][itmStereo][itmRight][itmCamera][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+  ROS_INFO("Dynamic->Stereo->Right->Rotation: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmDynamic][itmStereo][itmRight][itmRotation][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+  
+  ROS_INFO("Dynamic->Stereo->Reprojection: ");
+  for (uint i=0; i<4; i++) {
+    for (uint j=0; j<4; j++)
+      std::cerr<< camera_[itmCalibration][itmDynamic][itmStereo][itmReprojection][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+  ROS_INFO("Dynamic->Stereo->Angle->Epipolar/Vergence: ");
+  std::cerr<< camera_[itmCalibration][itmDynamic][itmStereo][itmAngle][itmEpipolar].asDouble()<<" ";
+  std::cerr<< camera_[itmCalibration][itmDynamic][itmStereo][itmAngle][itmVergence].asDouble()<<"\n";
+
+
+  ROS_INFO("Stereo->Left->Camera: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmStereo][itmLeft][itmCamera][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+  ROS_INFO("Stereo->Left->Rotation: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmStereo][itmLeft][itmRotation][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+    ROS_INFO("Stereo->Right->Camera: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmStereo][itmRight][itmCamera][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+  ROS_INFO("Stereo->Right->Rotation: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmStereo][itmRight][itmRotation][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+  
+  ROS_INFO("Stereo->Reprojection: ");
+  for (uint i=0; i<4; i++) {
+    for (uint j=0; j<4; j++)
+      std::cerr<< camera_[itmCalibration][itmStereo][itmReprojection][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+  ROS_INFO("Stereo->Angle->Epipolar/Vergence/OpticalAxis: ");
+  std::cerr<< camera_[itmCalibration][itmStereo][itmAngle][itmEpipolar].asDouble()<<" ";
+  std::cerr<< camera_[itmCalibration][itmStereo][itmAngle][itmVergence].asDouble()<<" ";
+  std::cerr<< camera_[itmCalibration][itmStereo][itmAngle][itmOpticalAxis].asDouble()<<"\n";
+
+  ROS_INFO("Stereo->Baseline: ");
+  std::cerr<< camera_[itmCalibration][itmStereo][itmBaseline].asDouble()<<"\n";
+
+  ROS_INFO("Monocular->Left->Camera: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmMonocular][itmLeft][itmCamera][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+  ROS_INFO("Monocular->Left->Distortion: ");
+  for (uint i=0; i<5; i++) 
+    std::cerr<< camera_[itmCalibration][itmMonocular][itmLeft][itmDistortion][i].asDouble()<<" ";
+  std::cerr<<"\n";
+
+  ROS_INFO("Monocular->Right->Camera: ");
+  for (uint i=0; i<3; i++) {
+    for (uint j=0; j<3; j++)
+      std::cerr<< camera_[itmCalibration][itmMonocular][itmRight][itmCamera][j][i].asDouble()<<" ";
+    std::cerr << "\n";
+  }
+
+  ROS_INFO("Monocular->Right->Distortion: ");
+  for (uint i=0; i<5; i++) 
+    std::cerr<< camera_[itmCalibration][itmMonocular][itmRight][itmDistortion][i].asDouble()<<" ";
+  std::cerr<<"\n";
+
+  
+}
+
+bool pcl::EnsensoGrabber::checkCalibration (double& max_error) 
+{
+  int num_items = (*root_)[itmParameters][itmPatternCount].asInt ();
+
+  // if (num_items < 1)
+  //   return false;
+  
+  NxLibCommand check_calibration (cmdMeasureCalibration);
+  try
+  {
+      
+    //    calibrate.execute ();  // Might take up to 120 sec (maximum allowed by Ensenso API)
+    check_calibration.execute();
+
+    max_error = 0;
+
+    for (uint i=0; i<num_items; i++)
+      max_error = std::max (max_error, check_calibration.result ()[itmPatterns][num_items-1][itmReprojectionError].asDouble());
+    // Convert
+
+    ROS_WARN_STREAM("Calibration error: "<<max_error);
+    
+  }
+  catch (NxLibException &ex)
+  {
+    ROS_WARN("checkCalibration Failed");
+    return (false);
+  }
+}
+
+
+
 
 bool pcl::EnsensoGrabber::loadEEPROMExtrinsicCalibration () const
 {
@@ -541,8 +760,8 @@ bool pcl::EnsensoGrabber::clearEEPROMExtrinsicCalibration ()
   {
     setExtrinsicCalibration("");
     NxLibCommand store (cmdStoreCalibration);
-    store.execute ();
-    return (true);
+    //    store.execute ();
+    return (false);
   }
   catch (NxLibException &ex)
   {
@@ -696,7 +915,7 @@ double pcl::EnsensoGrabber::getPatternGridSpacing () const
     ensensoExceptionHandling (ex, "getPatternGridSpacing");
     return (-1);
   }
-
+  
   return collect_pattern.result()[itmGridSpacing].asDouble();
 }
 
@@ -1012,13 +1231,13 @@ void pcl::EnsensoGrabber::processRaw ()
   {
     try
     {
-        boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
         
         capture.execute();
         raw_initialized_=true;
         
         if (num_slots<sig_cb_ensenso_raw_images>()>0) {
           
+          boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
           int width, height, channels, bpe;
           bool isFlt;
           

@@ -34,6 +34,7 @@ add_service_files(
   Lights.srv
   SetBool.srv
   GetPC.srv
+  GetCalError.srv
 )
 
 generate_messages(

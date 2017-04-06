@@ -109,20 +109,21 @@ public:
      * @note See [Capture tree item](http://www.ensenso.de/manual/index.html?capture.htm) for more
      * details about the parameters. */
     bool
-    configureCapture (const bool auto_exposure = true,
-                      const bool auto_gain = true,
+      configureCapture (const uint flexview = 2,
+                      const bool auto_exposure = true,
+                      const bool auto_gain = false,
                       const int bining = 1,
                       const float exposure = 1,
                       const bool front_light = false,
-                      const int gain = 1,
+                      const int gain = 4,
                       const bool gain_boost = false,
                       const bool hardware_gamma = true,
-                      const bool hdr = false,
-                      const int pixel_clock = 24,
+                      const bool hdr = true,
+                      const int pixel_clock = 43,
                       const bool projector = true,
                       const int target_brightness = 210,
                       const std::string trigger_mode = "Software",
-                      const bool use_disparity_map_area_of_interest = false) const;
+                      const bool use_disparity_map_area_of_interest = true) const;
 
     /** @brief Capture a single point cloud and store it
      * @param[out] cloud The cloud to be filled
@@ -166,8 +167,12 @@ public:
      * @warning A device must be opened and must not be running.
      * @note At least one calibration pattern must have been captured before, use @ref captureCalibrationPattern before */
     bool
-    estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, const bool average=false) const;
+    estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, const bool average=false);
 
+    bool checkCalibration(double& max_error);
+
+    bool getCalInfo();
+    
     /** @brief Computes the calibration matrix using the collected patterns and the robot poses vector
      * @param[in] robot_poses A list of robot poses, 1 for each pattern acquired (in the same order)
      * @param[out] json The extrinsic calibration data in JSON format
@@ -188,7 +193,7 @@ public:
                               const std::string target = "Hand",  // Default values: Hand or Workspace
                               const Eigen::Affine3d &guess_tf = Eigen::Affine3d::Identity (),
                               const bool pretty_format = true
-                              ) const;
+                              );
 
     /** @brief Copy the link defined in the Link node of the nxTree to the EEPROM
      * @return True if successful, false otherwise
