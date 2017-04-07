@@ -382,6 +382,10 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
   {
     NxLibCommand (cmdCapture).execute ();
 
+    NxLibCommand collect_pattern (cmdCollectPattern);
+    collect_pattern.parameters ()[itmBuffer].set (true);  // Store the pattern into the buffer
+    collect_pattern.execute ();
+
     if (num_slots<sig_cb_ensenso_raw_images>()>0) {
 
       boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
@@ -390,24 +394,21 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
       bool isFlt;
       
       double timestamp;
-      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+      camera_[itmImages][itmWithOverlay][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
       
-      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      camera_[itmImages][itmWithOverlay][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
       rawimages->first.header.stamp = rawimages->second.header.stamp = getPCLStamp (timestamp);
       rawimages->first.width = rawimages->second.width = width;
       rawimages->first.height = rawimages->second.height = height;
       rawimages->first.data.resize (width * height * sizeof(float));
       rawimages->second.data.resize (width * height * sizeof(float));
       rawimages->first.encoding = rawimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
-      camera_[itmImages][itmRaw][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
-      camera_[itmImages][itmRaw][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
+      camera_[itmImages][itmWithOverlay][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
+      camera_[itmImages][itmWithOverlay][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
       raw_images_signal_->operator () (rawimages);
     }
 
-
-    NxLibCommand collect_pattern (cmdCollectPattern);
-    collect_pattern.parameters ()[itmBuffer].set (true);  // Store the pattern into the buffer
-    collect_pattern.execute ();
+    
   }
   catch (NxLibException &ex)
   {
