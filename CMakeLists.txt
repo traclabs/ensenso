@@ -34,6 +34,7 @@ add_service_files(
   Lights.srv
   SetBool.srv
   GetPC.srv
+  GetMono.srv
   GetCalError.srv
 )
 

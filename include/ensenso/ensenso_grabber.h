@@ -49,6 +49,11 @@ public:
     typedef void
     (sig_cb_ensenso_point_cloud_images)(const pcl::PointCloud<pcl::PointXYZ>::Ptr &,
                                         const boost::shared_ptr<PairOfImages> &);
+
+    typedef void
+      (sig_cb_mono_images)(const boost::shared_ptr<pcl::PCLImage> &,
+                           const boost::shared_ptr<pcl::PCLImage> &);
+
     /** @endcond */
 
     /** @brief Constructor */
@@ -66,20 +71,29 @@ public:
      * @return True if successful, false otherwise */
     bool openDevice (std::string serial_no);
 
+    bool mono_openDevice (std::string serial_no);
+
     /** @brief Closes the Ensenso device
      * @return True if successful, false otherwise */
-    bool closeDevice ();
+    bool closeDevices ();
 
     /** @brief Start the point cloud and or image acquisition
      * @note Opens device "0" if no device is open */
-    void start ();
+    bool start_up ();
+    bool mono_start_up ();
 
+    void start() {}
+    
     /** @brief Stop the data acquisition */
     void stop ();
+
+    void mono_stop ();
 
     /** @brief Check if the data acquisition is still running
      * @return True if running, false otherwise */
     bool isRunning () const;
+
+    bool mono_isRunning () const;
 
     /** @brief Check if a TCP port is opened
      * @return True if open, false otherwise */
@@ -125,6 +139,20 @@ public:
                       const std::string trigger_mode = "Software",
                       const bool use_disparity_map_area_of_interest = true) const;
 
+    bool
+      mono_configureCapture (
+                      const bool auto_exposure = true,
+                      const bool auto_gain = false,
+                      const int bining = 1,
+                      const float exposure = 1,
+                      const int gain = 4,
+                      const bool gain_boost = false,
+                      const bool hardware_gamma = true,
+                      const int pixel_clock = 43,
+                      const int target_brightness = 210,
+                      const std::string trigger_mode = "Software") const;
+
+    
     /** @brief Capture a single point cloud and store it
      * @param[out] cloud The cloud to be filled
      * @return True if successful, false otherwise
@@ -132,6 +160,10 @@ public:
     bool
     grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud);
 
+    bool
+      grabSingleMono (pcl::PCLImage& image);
+
+    
     /** @brief Set up the Ensenso sensor and API to do 3D extrinsic calibration using the Ensenso 2D patterns
      * @param[in] grid_spacing
      * @return True if successful, false otherwise
@@ -145,7 +177,10 @@ public:
      */
     bool
     initExtrinsicCalibration (const double grid_spacing) const;
+    bool
+    initMonoCalibration (const double grid_spacing) const;
 
+    
     /** @brief Clear calibration patterns buffer */
     bool
     clearCalibrationPatternBuffer () const;
@@ -157,6 +192,10 @@ public:
     int
     captureCalibrationPattern () const;
 
+    int
+    captureMonoCalibrationPattern () const;
+
+    
     /** @brief Estimate the calibration pattern pose
      * @param[out] pattern_pose the calibration pattern pose
      * @param[in] average Specifies if all pattern point coordinates in the buffer 
@@ -195,6 +234,13 @@ public:
                               const bool pretty_format = true
                               );
 
+    bool
+    computeMonoCalibrationMatrix (
+                              std::string &json,
+                              const bool pretty_format = true
+                              );
+
+    
     /** @brief Copy the link defined in the Link node of the nxTree to the EEPROM
      * @return True if successful, false otherwise
      * Refer to @ref setExtrinsicCalibration for more information about how the EEPROM works.\n
@@ -297,7 +343,8 @@ public:
      * @note See: [sensor_msgs/CameraInfo](http://docs.ros.org/api/sensor_msgs/html/msg/CameraInfo.html)
      */
     bool getCameraInfo(std::string cam, sensor_msgs::CameraInfo &cam_info) const;
-
+    bool mono_getCameraInfo(sensor_msgs::CameraInfo &cam_info) const;
+    
     /** @brief Get the Euler angles corresponding to a JSON string (an angle axis transformation)
      * @param[in] json A string containing the angle axis transformation in JSON format
      * @param[out] x The X translation
@@ -420,13 +467,13 @@ public:
     /** @brief Reference to the camera tree
      *  @warning You must handle NxLib exceptions manually when playing with @ref camera_ ! */
     NxLibItem camera_;
+    NxLibItem mono_camera_;
 
 protected:
     /** @brief Grabber thread */
-    boost::thread raw_thread_, points_thread_;
+    boost::thread raw_thread_, points_thread_, mono_thread_;
 
-    /** @brief Boost point cloud signal */
-    //    boost::signals2::signal<sig_cb_ensenso_point_cloud>* point_cloud_signal_;
+    boost::signals2::signal<sig_cb_mono_images>* mono_images_signal_;
 
     /** @brief Boost images signal */
     boost::signals2::signal<sig_cb_ensenso_raw_images>* raw_images_signal_;
@@ -434,17 +481,21 @@ protected:
     /** @brief Boost images + point cloud signal */
     boost::signals2::signal<sig_cb_ensenso_point_cloud_images>* point_cloud_images_signal_;
 
+   
     /** @brief Whether an Ensenso device is opened or not */
     bool device_open_;
+    bool mono_device_open_;
 
     /** @brief Whether an TCP port is opened or not */
     bool tcp_open_;
 
     /** @brief The serial number used to open the camera */
     std::string serial_;
+    std::string mono_serial_;
 
     /** @brief Whether an Ensenso device is running or not */
     bool running_;
+    bool mono_running_;
 
     /** @brief Point cloud capture/processing frequency */
     std::deque<double> times_;
@@ -477,7 +528,8 @@ protected:
      * @note The cloud time stamp is the RAW image time stamp */
     void processRaw ();
     void processPoints ();
-
+    void processMono();
+    
     bool raw_initialized_;
 };
 }  // namespace pcl

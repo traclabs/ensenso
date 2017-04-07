@@ -2,14 +2,12 @@
 <launch>
 
   <arg name="serial" default="160875" />
+  <arg name="mono_serial" default="160875" />
   
   <!-- Ensenso node -->
   <node name="ensenso_node" pkg="ensenso" type="ensenso_node" ns="ensenso" output="screen"> 
     <param name="serial"          type="string" value="$(arg serial)" />
-    <param name="camera_frame_id" type="string" value="ensenso_optical_frame" />
-    <param name="point_cloud"     type="bool"   value="true" />
-    <param name="front_light"     type="bool"   value="false" />
-    <param name="projector"       type="bool"   value="true" />
+    <param name="mono_serial"     type="string" value="$(arg mono_serial)" />
   </node>
 
   <node pkg="tf" type="static_transform_publisher" name="ensenso_broadcaster"

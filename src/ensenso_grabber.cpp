@@ -23,10 +23,15 @@ void ensensoExceptionHandling (const NxLibException &ex,
 pcl::EnsensoGrabber::EnsensoGrabber () :
   device_open_ (false),
   tcp_open_ (false),
-  running_ (false)
+  running_ (false),
+  mono_running_ (false)
 {
   raw_images_signal_ = createSignal<sig_cb_ensenso_raw_images> ();
   point_cloud_images_signal_ = createSignal<sig_cb_ensenso_point_cloud_images> ();
+
+  mono_images_signal_ = createSignal<sig_cb_mono_images> ();
+
+  
   PCL_INFO ("Initialising nxLib\n");
 
   try
@@ -37,7 +42,7 @@ pcl::EnsensoGrabber::EnsensoGrabber () :
   catch (NxLibException &ex)
   {
     ensensoExceptionHandling (ex, "EnsensoGrabber");
-    PCL_THROW_EXCEPTION (pcl::IOException, "Could not initialise NxLib.");  // If constructor fails; throw exception
+    ROS_FATAL("Could not initialise NxLib.");  // If constructor fails; throw exception
   }
 }
 
@@ -46,11 +51,13 @@ pcl::EnsensoGrabber::~EnsensoGrabber () throw ()
   try
   {
     stop ();
+    mono_stop();
     root_.reset ();
 
     disconnect_all_slots<sig_cb_ensenso_raw_images> ();
     disconnect_all_slots<sig_cb_ensenso_point_cloud_images> ();
-
+    disconnect_all_slots<sig_cb_mono_images> ();
+    
     if (tcp_open_)
       closeTcpPort ();
     nxLibFinalize ();
@@ -91,8 +98,10 @@ int pcl::EnsensoGrabber::enumDevices () const
 
 bool pcl::EnsensoGrabber::openDevice (std::string serial_no)
 {
-  if (device_open_)
-    PCL_THROW_EXCEPTION (pcl::IOException, "Cannot open multiple devices!");
+  if (device_open_) {
+   ROS_ERROR("Cannot open multiple devices!");
+   return false;
+  }
   PCL_INFO ("Opening Ensenso stereo camera S/N: %s\n", serial_no.c_str());
 
   ros::Time start_time = ros::Time::now();
@@ -105,7 +114,7 @@ bool pcl::EnsensoGrabber::openDevice (std::string serial_no)
         
       if (!camera_.exists () || camera_[itmType] != valStereo)
         {
-          PCL_THROW_EXCEPTION (pcl::IOException, "Please connect a single stereo camera to your computer!");
+          ROS_FATAL_STREAM("Stereo camera "<<serial_no<<" not found on system");
         }
 
       while (!camera_[itmStatus][itmAvailable].asBool()) {
@@ -137,41 +146,108 @@ bool pcl::EnsensoGrabber::openDevice (std::string serial_no)
   return (true);
 }
 
-bool pcl::EnsensoGrabber::closeDevice ()
+bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no)
 {
-  if (!device_open_)
-    return (false);
+  if (mono_device_open_) {
+   ROS_ERROR("Cannot open multiple devices!");
+   return false;
+  }
+  PCL_INFO ("Opening Ueye Monocular camera S/N: %s\n", serial_no.c_str());
 
+  ros::Time start_time = ros::Time::now();
+  bool isOpen = false;
+  NxLibException exception("None",0);
+  try
+    {
+      // Create a pointer referencing the camera's tree item, for easier access:
+      mono_camera_ = (*root_)[itmCameras][itmBySerialNo][serial_no];
+        
+      if (!mono_camera_.exists () || mono_camera_[itmType] != valMonocular)
+        {
+          ROS_FATAL_STREAM("Monocular camera "<<serial_no<<" not found on system");
+        }
+
+      while (!mono_camera_[itmStatus][itmAvailable].asBool()) {
+        ROS_WARN_STREAM_THROTTLE(1,"Camera "<<serial_no<<" exists but is not available.  Trying again.");
+      }
+      
+      do {
+        NxLibCommand open (cmdOpen);
+        open.parameters ()[itmCameras] = mono_camera_[itmSerialNumber].asString ();
+        open.execute ();
+        mono_serial_=serial_no;
+        isOpen=mono_camera_[itmStatus][itmOpen].asBool();
+        if (!isOpen)
+          ROS_WARN_STREAM_THROTTLE(1,"Having trouble opening camera "<<serial_no<<".  Trying again.");
+      } while (!isOpen);
+    }
+  catch (NxLibException &ex)
+    {
+      exception = ex;
+    }
+  
+  if (!isOpen) {
+    ensensoExceptionHandling (exception, "mono_openDevice");
+    return (false);
+  }
+
+  ROS_INFO_STREAM("Camera "<<serial_no<<" ready for use");
+  mono_device_open_ = true;
+  return (true);
+}
+
+
+bool pcl::EnsensoGrabber::closeDevices ()
+{
   stop ();
-  PCL_INFO ("Closing Ensenso stereo camera\n");
+  mono_stop();
+  PCL_INFO ("Closing all nxLibrary cameras\n");
 
   try
   {
     NxLibCommand (cmdClose).execute ();
     device_open_ = false;
+    mono_device_open_=false;
   }
   catch (NxLibException &ex)
   {
-    ensensoExceptionHandling (ex, "closeDevice");
+    ensensoExceptionHandling (ex, "closeDevices");
     return (false);
   }
   return (true);
 }
 
-void pcl::EnsensoGrabber::start ()
+
+
+bool pcl::EnsensoGrabber::start_up ()
 {
   if (isRunning ())
-    return;
+    return true;
 
   if (!device_open_)
-    openDevice (0);
+    return false;
 
   times_.clear();
   running_ = true;
   raw_initialized_=false;
   raw_thread_ = boost::thread (&pcl::EnsensoGrabber::processRaw, this);
   points_thread_ = boost::thread (&pcl::EnsensoGrabber::processPoints, this);
+  return true;
 }
+
+bool pcl::EnsensoGrabber::mono_start_up ()
+{
+  if (mono_isRunning ())
+    return true;
+
+  if (!mono_device_open_)
+    return false;
+
+  mono_running_ = true;
+  mono_thread_ = boost::thread (&pcl::EnsensoGrabber::processMono, this);
+  return true;
+}
+
 
 void pcl::EnsensoGrabber::stop ()
 {
@@ -183,9 +259,24 @@ void pcl::EnsensoGrabber::stop ()
   }
 }
 
+void pcl::EnsensoGrabber::mono_stop ()
+{
+  if (mono_running_)
+  {
+    mono_running_ = false;  // Stop processGrabbing () callback
+    mono_thread_.join ();
+  }
+}
+
+
 bool pcl::EnsensoGrabber::isRunning () const
 {
   return (running_);
+}
+
+bool pcl::EnsensoGrabber::mono_isRunning () const
+{
+  return (mono_running_);
 }
 
 bool pcl::EnsensoGrabber::isTcpPortOpen () const
@@ -280,6 +371,86 @@ bool pcl::EnsensoGrabber::configureCapture(const uint flexview,
   return (true);
 }
 
+
+bool pcl::EnsensoGrabber::mono_configureCapture(
+                                           const bool auto_exposure,
+                                           const bool auto_gain,
+                                           const int bining,
+                                           const float exposure,
+                                           const int gain,
+                                           const bool gain_boost,
+                                           const bool hardware_gamma,
+                                           const int pixel_clock,
+                                           const int target_brightness,
+                                           const std::string trigger_mode) const
+
+{
+  if (!mono_device_open_)
+    return (false);
+
+  try
+  {
+    NxLibItem captureParams = mono_camera_[itmParameters][itmCapture];
+    captureParams[itmAutoExposure].set (auto_exposure);
+    captureParams[itmAutoGain].set (auto_gain);
+    captureParams[itmBinning].set (bining);
+    captureParams[itmExposure].set (exposure);
+    captureParams[itmGain].set (gain);
+    captureParams[itmGainBoost].set (gain_boost);
+    captureParams[itmHardwareGamma].set (hardware_gamma);
+    captureParams[itmPixelClock].set (pixel_clock);
+    captureParams[itmTargetBrightness].set (target_brightness);
+    captureParams[itmTriggerMode].set (trigger_mode);
+
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "mono_configureCapture");
+    return (false);
+  }
+  return (true);
+}
+
+
+bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
+{
+  if (!device_open_)
+    return (false);
+
+  //  if (running_)
+  //    return (false);
+
+  try
+  {
+    NxLibCommand capture(cmdCapture);
+    capture.parameters ()[itmCameras].set(mono_serial_);
+    capture.execute ();
+
+    int width, height, channels, bpe;
+    bool isFlt;
+          
+    double timestamp;
+    mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+          
+    mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+    image.header.stamp = getPCLStamp (timestamp);
+    image.width = width;
+    image.height = height;
+    image.data.resize (width * height * sizeof(float));
+    image.encoding = getOpenCVType (channels, bpe, isFlt);
+          
+    mono_camera_[itmImages][itmRectified].getBinaryData (image.data.data (), image.data.size (), 0, 0);
+    
+    return (true);
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "grabSingleMono");
+    return (false);
+  }
+}
+
+
 bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud)
 {
   if (!device_open_)
@@ -290,7 +461,9 @@ bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud
 
   try
   {
-    NxLibCommand (cmdCapture).execute ();
+    NxLibCommand capture(cmdCapture);
+    capture.parameters ()[itmCameras].set(serial_);
+    capture.execute ();
     // Stereo matching task
     NxLibCommand (cmdComputeDisparityMap).execute ();
     // Convert disparity map into XYZ data for each pixel
@@ -351,6 +524,30 @@ bool pcl::EnsensoGrabber::initExtrinsicCalibration (const double grid_spacing) c
   return (true);
 }
 
+
+bool pcl::EnsensoGrabber::initMonoCalibration (const double grid_spacing) const
+{
+  if (!device_open_ || !mono_device_open_)
+    return (false);
+
+  if (running_ || mono_running_)
+    return (false);
+
+  try
+  {
+    if (!clearCalibrationPatternBuffer ())
+      return (false);
+    (*root_)[itmParameters][itmPattern][itmGridSpacing].set (grid_spacing);
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "initExtrinsicCalibration");
+    return (false);
+  }
+  return (true);
+}
+
+
 bool pcl::EnsensoGrabber::clearCalibrationPatternBuffer () const
 {
   if (!device_open_)
@@ -380,9 +577,12 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
 
   try
   {
-    NxLibCommand (cmdCapture).execute ();
-
+    NxLibCommand capture(cmdCapture);
+    capture.parameters()[itmCameras].set(serial_);
+    capture.execute ();
+    
     NxLibCommand collect_pattern (cmdCollectPattern);
+    collect_pattern.parameters ()[itmCameras].set(serial_);
     collect_pattern.parameters ()[itmBuffer].set (true);  // Store the pattern into the buffer
     collect_pattern.execute ();
 
@@ -418,6 +618,86 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
 
   return ( (*root_)[itmParameters][itmPatternCount].asInt ());
 }
+
+
+int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
+{
+  if (!device_open_ || !mono_device_open_)
+    return (-1);
+
+  if (running_ || mono_running_)
+    return (-1);
+
+  try
+  {
+    NxLibCommand capture (cmdCapture);
+
+    std::string devices[2]={serial_,mono_serial_};
+
+    capture.parameters()[itmCameras].set(devices[0]);
+    capture.execute();
+
+    capture.parameters()[itmCameras].set(devices[1]);
+    capture.execute();
+    
+    NxLibCommand collect_pattern (cmdCollectPattern);
+    collect_pattern.parameters ()[itmCameras].set(devices);
+    collect_pattern.parameters ()[itmBuffer].set (true);  // Store the pattern into the buffer
+    collect_pattern.execute ();
+
+    if (num_slots<sig_cb_ensenso_raw_images>()>0) {
+
+      boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
+      
+      int width, height, channels, bpe;
+      bool isFlt;
+      
+      double timestamp;
+      camera_[itmImages][itmWithOverlay][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+      
+      camera_[itmImages][itmWithOverlay][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      rawimages->first.header.stamp = getPCLStamp (timestamp);
+      rawimages->first.width = width;
+      rawimages->first.height = height;
+      rawimages->first.data.resize (width * height * sizeof(float));
+      rawimages->first.encoding = getOpenCVType (channels, bpe, isFlt);
+      camera_[itmImages][itmWithOverlay][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
+      raw_images_signal_->operator () (rawimages);
+    }
+
+    if (num_slots<sig_cb_mono_images>()>0) {
+          
+      boost::shared_ptr<pcl::PCLImage> rawimage (new pcl::PCLImage);
+      boost::shared_ptr<pcl::PCLImage> rectimage (new pcl::PCLImage);
+      int width, height, channels, bpe;
+      bool isFlt;
+      
+      double timestamp;
+      mono_camera_[itmImages][itmWithOverlay].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+      
+      mono_camera_[itmImages][itmWithOverlay].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      rawimage->header.stamp = getPCLStamp (timestamp);
+      rawimage->width = width;
+      rawimage->height = height;
+      rawimage->data.resize (width * height * sizeof(float));
+      rawimage->encoding = getOpenCVType (channels, bpe, isFlt);
+      
+      mono_camera_[itmImages][itmWithOverlay].getBinaryData (rawimage->data.data (), rawimage->data.size (), 0, 0);
+      
+      mono_images_signal_->operator () (rawimage,rectimage);
+    }
+    
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "captureMonoCalibrationPattern");
+    return (-1);
+  }
+
+  return ( (*root_)[itmParameters][itmPatternCount].asInt ());
+}
+
+
 
 bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, const bool average) 
 {
@@ -575,6 +855,65 @@ bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Aff
 }
 
 
+
+bool pcl::EnsensoGrabber::computeMonoCalibrationMatrix (
+                          std::string &json,
+                          const bool pretty_format
+                          ) 
+{
+
+  int num_items = (*root_)[itmParameters][itmPatternCount].asInt ();
+  
+  NxLibCommand calibrate (cmdCalibrate);
+  std::string devices[2]={serial_,mono_serial_};
+  try
+  {
+    calibrate.parameters()[itmCameras].set(devices);   
+    calibrate.execute ();  
+
+   
+    if (calibrate.successful())
+    {
+      NxLibItem calibParams = mono_camera_[itmLink];
+      json = calibParams.asJson (pretty_format);
+
+      //Delete the link inof so the data isn't modified
+      calibParams[itmTarget].set("");
+      calibParams[itmRotation][itmAngle].set (0);
+      
+      calibParams[itmRotation][itmAxis][0].set (0);
+      calibParams[itmRotation][itmAxis][1].set (0);
+      calibParams[itmRotation][itmAxis][2].set (0);
+      
+      calibParams[itmTranslation][0].set (0);  // Convert in millimeters
+      calibParams[itmTranslation][1].set (0);
+      calibParams[itmTranslation][2].set (0);
+      
+      ROS_INFO_STREAM("compute Mono Result: " << std::endl << json);
+      return (true);
+    }
+    else
+      {
+        json.clear ();
+        return (false);
+      }
+  }
+  catch (NxLibException &ex)
+    {
+      try
+        {
+          return (false);
+        }
+      catch (...) {
+        ensensoExceptionHandling (ex, "computeMonoCalibrationMatrix");
+      } 
+      
+    }
+}
+
+
+
+
 bool pcl::EnsensoGrabber::storeEEPROMExtrinsicCalibration () const
 {
   try
@@ -712,10 +1051,9 @@ bool pcl::EnsensoGrabber::checkCalibration (double& max_error)
   // if (num_items < 1)
   //   return false;
   
-  NxLibCommand check_calibration (cmdMeasureCalibration);
   try
   {
-      
+    NxLibCommand check_calibration (cmdMeasureCalibration);      
     //    calibrate.execute ();  // Might take up to 120 sec (maximum allowed by Ensenso API)
     check_calibration.execute();
 
@@ -906,7 +1244,11 @@ double pcl::EnsensoGrabber::getPatternGridSpacing () const
   NxLibCommand collect_pattern (cmdCollectPattern);
   try
   {
-    NxLibCommand (cmdCapture).execute ();
+    NxLibCommand capture(cmdCapture);
+    capture.parameters()[itmCameras].set(serial_);
+    capture.execute ();
+
+    collect_pattern.parameters()[itmCameras].set(serial_);
     collect_pattern.parameters ()[itmBuffer].set (false);
     collect_pattern.parameters ()[itmDecodeData].set (true);
     collect_pattern.execute ();
@@ -982,6 +1324,34 @@ bool pcl::EnsensoGrabber::getCameraInfo(std::string cam, sensor_msgs::CameraInfo
       double B = camera_[itmCalibration][itmStereo][itmBaseline].asDouble() / 1000.0;
       double fx = cam_info.P[0];
       cam_info.P[3] = (-fx * B);
+    }
+    return true;
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "getCameraInfo");
+    return false;
+  }
+}
+
+bool pcl::EnsensoGrabber::mono_getCameraInfo(sensor_msgs::CameraInfo &cam_info) const
+{
+  try
+  {
+    cam_info.width = mono_camera_[itmSensor][itmSize][0].asInt();
+    cam_info.height = mono_camera_[itmSensor][itmSize][1].asInt();
+    cam_info.distortion_model = "plumb_bob";
+    // Distorsion factors
+    cam_info.D.resize(5);
+    for(std::size_t i = 0; i < cam_info.D.size(); ++i)
+      cam_info.D[i] = camera_[itmCalibration][itmDistortion][i].asDouble();
+    // K and R matrices
+    for(std::size_t i = 0; i < 3; ++i)
+    {
+      for(std::size_t j = 0; j < 3; ++j)
+      {
+        cam_info.K[3*i+j] = camera_[itmCalibration][itmCamera][j][i].asDouble();
+      }
     }
     return true;
   }
@@ -1222,8 +1592,7 @@ std::string pcl::EnsensoGrabber::getOpenCVType (const int channels,
 
 void pcl::EnsensoGrabber::processRaw ()
 {
-  NxLibCommand capture(cmdCapture, "raw");
-
+  NxLibCommand capture(cmdCapture, "raw");  
   ros::Rate loop_rate(3);
   
   bool continue_grabbing = running_;
@@ -1232,7 +1601,8 @@ void pcl::EnsensoGrabber::processRaw ()
   {
     try
     {
-        
+
+        capture.parameters()[itmCameras].set(serial_);
         capture.execute();
         raw_initialized_=true;
         
@@ -1265,6 +1635,8 @@ void pcl::EnsensoGrabber::processRaw ()
     continue_grabbing = running_;
   }
 }
+
+
 
 void pcl::EnsensoGrabber::processPoints ()
 {
@@ -1348,5 +1720,63 @@ void pcl::EnsensoGrabber::processPoints ()
     loop_rate.sleep();
     
     continue_grabbing = running_;
+  }
+}
+
+
+void pcl::EnsensoGrabber::processMono ()
+{
+  NxLibCommand capture(cmdCapture, "mono");
+  ros::Rate loop_rate(3);
+  
+  bool continue_grabbing = mono_running_;
+
+  while (continue_grabbing)
+  {
+    try
+    {
+        capture.parameters()[itmCameras].set(mono_serial_);
+        capture.execute();
+        
+        if (num_slots<sig_cb_mono_images>()>0) {
+          
+          boost::shared_ptr<pcl::PCLImage> rawimage (new pcl::PCLImage);
+          boost::shared_ptr<pcl::PCLImage> rectimage (new pcl::PCLImage);
+          int width, height, channels, bpe;
+          bool isFlt;
+          
+          double timestamp;
+          mono_camera_[itmImages][itmRaw].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+          
+          mono_camera_[itmImages][itmRaw].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+          rawimage->header.stamp = getPCLStamp (timestamp);
+          rawimage->width = width;
+          rawimage->height = height;
+          rawimage->data.resize (width * height * sizeof(float));
+          rawimage->encoding = getOpenCVType (channels, bpe, isFlt);
+          
+          mono_camera_[itmImages][itmRaw].getBinaryData (rawimage->data.data (), rawimage->data.size (), 0, 0);
+
+          mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+          
+          mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+          rectimage->header.stamp = getPCLStamp (timestamp);
+          rectimage->width = width;
+          rectimage->height = height;
+          rectimage->data.resize (width * height * sizeof(float));
+          rectimage->encoding = getOpenCVType (channels, bpe, isFlt);
+          
+          mono_camera_[itmImages][itmRectified].getBinaryData (rectimage->data.data (), rectimage->data.size (), 0, 0);
+
+                    
+          mono_images_signal_->operator () (rawimage,rectimage);
+        }
+    }
+    catch (NxLibException &ex)
+      {
+        ensensoExceptionHandling (ex, "processMono");
+      }
+    loop_rate.sleep();
+    continue_grabbing = mono_running_;
   }
 }

@@ -21,6 +21,7 @@
 
 // PCL headers
 #include <pcl/common/transforms.h>
+#include <pcl_conversions/pcl_conversions.h>
 
 // Ensenso grabber
 #include <ensenso/ensenso_grabber.h>
@@ -33,6 +34,7 @@
 #include <ensenso/InitCalibration.h>
 #include <ensenso/SetBool.h>
 #include <ensenso/GetPC.h>
+#include <ensenso/GetMono.h>
 #include <ensenso/GetCalError.h>
 #include <std_srvs/Trigger.h>
 
@@ -49,17 +51,25 @@ class EnsensoNode
     // ROS
     ros::NodeHandle                   nh_, nh_private_;
     ros::ServiceServer                calibrate_srv_;
+    ros::ServiceServer                mono_calibrate_srv_;
     ros::ServiceServer                capture_srv_;
+    ros::ServiceServer                mono_capture_srv_;
     ros::ServiceServer                checkcalib_srv_;
     ros::ServiceServer                grid_spacing_srv_;
     ros::ServiceServer                init_cal_srv_;
+    ros::ServiceServer                init_mono_cal_srv_;
     ros::ServiceServer                lights_srv_;
     ros::ServiceServer                start_srv_;
+    ros::ServiceServer                mono_start_srv_;
     ros::ServiceServer                single_pc_;
+    ros::ServiceServer                single_mono_;
     ros::ServiceServer                configure_srv_;
     // Images
     image_transport::CameraPublisher  l_raw_pub_;
     image_transport::CameraPublisher  r_raw_pub_;
+    image_transport::CameraPublisher  mono_raw_pub_;
+
+    image_transport::Publisher        mono_rectified_pub_;
     image_transport::Publisher        l_rectified_pub_;
     image_transport::Publisher        r_rectified_pub_;
     // Point cloud
@@ -71,34 +81,45 @@ class EnsensoNode
 
     // TF
     std::string                       camera_frame_id_;
+    std::string                       mono_camera_frame_id_;
     // Ensenso grabber
     boost::signals2::connection       connection_;
+    boost::signals2::connection       connection2_;
+    boost::signals2::connection       mono_connection_;
     pcl::EnsensoGrabber::Ptr          ensenso_ptr_;
 
-    bool pc_camera_configuration;
+  bool pc_camera_configuration, mono_camera_configuration;
   
   public:
      EnsensoNode(): 
       nh_private_("~")
     {
       // Read parameters
-      std::string serial;
-      pc_camera_configuration = false;
+      std::string serial, mono_serial;
+      pc_camera_configuration = mono_camera_configuration = false;
       nh_private_.param(std::string("serial"), serial, std::string("0"));
       if (!nh_private_.hasParam("serial"))
         ROS_WARN_STREAM("Parameter [~serial] not found, using default: " << serial);
+      nh_private_.param(std::string("mono_serial"), mono_serial, std::string("0"));
+      if (!nh_private_.hasParam("mono_serial"))
+        ROS_WARN_STREAM("Parameter [~mono_serial] not found, using default: " << mono_serial);
+
       nh_private_.param("camera_frame_id", camera_frame_id_, std::string("ensenso_optical_frame"));
       if (!nh_private_.hasParam("camera_frame_id"))
         ROS_WARN_STREAM("Parameter [~camera_frame_id] not found, using default: " << camera_frame_id_);
+
+      nh_private_.param("mono_camera_frame_id", camera_frame_id_, std::string("ueye_optical_frame"));
+      if (!nh_private_.hasParam("mono_camera_frame_id"))
+        ROS_WARN_STREAM("Parameter [~mono_camera_frame_id] not found, using default: " << mono_camera_frame_id_);
       // Booleans
-      bool front_light, projector;
-      nh_private_.param("front_light", front_light, false);
-      if (!nh_private_.hasParam("front_light"))
-        ROS_WARN_STREAM("Parameter [~front_light] not found, using default: " << front_light);
-      nh_private_.param("projector", projector, false);
-      if (!nh_private_.hasParam("projector"))
-        ROS_WARN_STREAM("Parameter [~projector] not found, using default: " << projector);
-      nh_private_.param("point_cloud", point_cloud_, false);
+      // bool front_light, projector;
+      // nh_private_.param("front_light", front_light, false);
+      // if (!nh_private_.hasParam("front_light"))
+      //   ROS_WARN_STREAM("Parameter [~front_light] not found, using default: " << front_light);
+      // nh_private_.param("projector", projector, false);
+      // if (!nh_private_.hasParam("projector"))
+      //   ROS_WARN_STREAM("Parameter [~projector] not found, using default: " << projector);
+      nh_private_.param("point_cloud", point_cloud_, true);
       if (!nh_private_.hasParam("point_cloud"))
         ROS_WARN_STREAM("Parameter [~point_cloud] not found, using default: " << point_cloud_);
       // Advertise topics
@@ -107,13 +128,26 @@ class EnsensoNode
       r_raw_pub_ = it.advertiseCamera("right/image_raw", 1);
       l_rectified_pub_ = it.advertise("left/image_rect", 1);
       r_rectified_pub_ = it.advertise("right/image_rect", 1);
+
+      //      image_transport::ImageTransport it_mono(nh_);
+      mono_raw_pub_ = it.advertiseCamera("/mono/image_raw", 1);
+      mono_rectified_pub_ = it.advertise("/mono/image_rect", 1);
+      
       cloud_pub_ = nh_.advertise<sensor_msgs::PointCloud2 >("depth/points", 1); 
       linfo_pub_=nh_.advertise<sensor_msgs::CameraInfo> ("left/camera_info", 1, true); // Latched
       rinfo_pub_=nh_.advertise<sensor_msgs::CameraInfo> ("right/camera_info", 1, true);
+
       // Initialize Ensenso
       ensenso_ptr_.reset(new pcl::EnsensoGrabber);
-      ensenso_ptr_->openDevice(serial);
-      ensenso_ptr_->openTcpPort();
+      //      ensenso_ptr_->openTcpPort();
+      if (serial != "0") {
+        ensenso_ptr_->openDevice(serial);
+      }
+
+      if (mono_serial != "0") {
+        ensenso_ptr_->mono_openDevice(mono_serial);
+      }
+      
       //      ensenso_ptr_->configureCapture();
       //      ensenso_ptr_->enableProjector(projector);
       //      ensenso_ptr_->enableFrontLight(front_light);
@@ -123,23 +157,33 @@ class EnsensoNode
       req.cloud = point_cloud_;
       req.images = true;
       configureStreamingCB(req, res);
+
+      mono_configureStreaming();
       //      ensenso_ptr_->start();
       // Advertise services
-      capture_srv_ = nh_.advertiseService("capture_pattern", &EnsensoNode::capturePatternCB, this);
-      calibrate_srv_ = nh_.advertiseService("compute_calibration", &EnsensoNode::computeCalibrationCB, this);
-      checkcalib_srv_ =nh_.advertiseService("check_calibration", &EnsensoNode::checkCalibrationCB, this);
+      capture_srv_ = nh_.advertiseService("stereo_capture_pattern", &EnsensoNode::capturePatternCB, this);
+      mono_capture_srv_ = nh_.advertiseService("mono_capture_pattern", &EnsensoNode::mono_capturePatternCB, this);
+      calibrate_srv_ = nh_.advertiseService("compute_stereo_calibration", &EnsensoNode::computeCalibrationCB, this);
+      mono_calibrate_srv_ = nh_.advertiseService("compute_mono_calibration", &EnsensoNode::computeMonoCalibrationCB, this);
+      checkcalib_srv_ =nh_.advertiseService("check_stereo_calibration", &EnsensoNode::checkCalibrationCB, this);
+      init_cal_srv_ = nh_.advertiseService("init_stereo_calibration", &EnsensoNode::initCalibrationCB, this);
+      init_mono_cal_srv_ = nh_.advertiseService("init_mono_calibration", &EnsensoNode::initMonoCalibrationCB, this);
+      start_srv_ = nh_.advertiseService("start_stereo_streaming", &EnsensoNode::startStreamingCB, this);
+      mono_start_srv_ = nh_.advertiseService("start_mono_streaming", &EnsensoNode::mono_startStreamingCB, this);
+      single_pc_ = nh_.advertiseService("get_single_pc", &EnsensoNode::getSinglePCCB, this);
+      single_mono_ = nh_.advertiseService("get_single_mono", &EnsensoNode::getSingleMonoCB, this);
+
       configure_srv_ = nh_.advertiseService("configure_streaming", &EnsensoNode::configureStreamingCB, this);
       grid_spacing_srv_ = nh_.advertiseService("grid_spacing", &EnsensoNode::gridSpacingCB, this);
-      init_cal_srv_ = nh_.advertiseService("init_calibration", &EnsensoNode::initCalibrationCB, this);
+
       lights_srv_ = nh_.advertiseService("lights", &EnsensoNode::lightsCB, this);
-      start_srv_ = nh_.advertiseService("start_streaming", &EnsensoNode::startStreamingCB, this);
-      single_pc_ = nh_.advertiseService("get_single_pc", &EnsensoNode::getSinglePCCB, this);
+
     }
     
     ~EnsensoNode()
     {
       ensenso_ptr_->closeTcpPort();
-      ensenso_ptr_->closeDevice();
+      ensenso_ptr_->closeDevices();
     }
     
     bool lightsCB(ensenso::Lights::Request& req, ensenso::Lights::Response &res)
@@ -178,6 +222,31 @@ class EnsensoNode
       return true;
     }
 
+    bool mono_capturePatternCB(ensenso::CapturePattern::Request& req, ensenso::CapturePattern::Response &res)
+    {
+      if (ensenso_ptr_->isRunning())
+        ensenso_ptr_->stop();
+
+      if (ensenso_ptr_->mono_isRunning())
+        ensenso_ptr_->mono_stop();
+
+      
+      if (req.clear_buffer)
+      {
+        if (!ensenso_ptr_->clearCalibrationPatternBuffer ()) {
+          res.success = false;
+          res.pattern_count = 0;
+          return true;
+        }
+      }
+
+      res.pattern_count = ensenso_ptr_->captureMonoCalibrationPattern();
+      res.success = (res.pattern_count > 0);
+      return true;
+    }
+
+
+  
     bool checkCalibrationCB(ensenso::GetCalError::Request& req, ensenso::GetCalError::Response &res) {
       // Very important to stop the camera before performing the calibration
       bool was_running = ensenso_ptr_->isRunning();
@@ -253,7 +322,43 @@ class EnsensoNode
       //        ensenso_ptr_->start();
       return true;
     }
-    
+
+    bool computeMonoCalibrationCB(ensenso::ComputeCalibration::Request& req, ensenso::ComputeCalibration::Response &res)
+    {
+      // Very important to stop the camera before performing the calibration
+      if (ensenso_ptr_->isRunning())
+        ensenso_ptr_->stop();
+
+      if (ensenso_ptr_->mono_isRunning())
+        ensenso_ptr_->mono_stop();
+
+      std::string result;
+      if (!ensenso_ptr_->computeMonoCalibrationMatrix(result))
+        res.success = false;
+      else {
+        ROS_INFO("Calibration computation finished");
+
+        res.success = true;
+        Eigen::Affine3d eigen_result;
+        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
+        eigen_result.translation () /= 1000.0;  // Convert translation to meters (Ensenso API returns milimeters)
+        eigen_result=eigen_result.inverse();
+        tf::poseEigenToMsg(eigen_result, res.result);
+
+        tf::Transform T;
+        tf::transformEigenToTF(eigen_result, T);
+       
+        double r,p,y;
+
+        T.getBasis().getRPY(r,p,y);
+        ROS_INFO_STREAM("X,Y,Z: "<< T.getOrigin().x()<<" "<<T.getOrigin().y()<<" "<<T.getOrigin().z());
+        ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<y);
+        
+      }
+      return true;
+    }
+
+  
     bool configureStreamingCB(ensenso::ConfigureStreaming::Request& req, ensenso::ConfigureStreaming::Response &res)
     {
       bool was_running = ensenso_ptr_->isRunning();
@@ -261,6 +366,7 @@ class EnsensoNode
         ensenso_ptr_->stop();
       // Disconnect previous connection
       connection_.disconnect();
+      connection2_.disconnect();
       // Connect new signals
       if (req.cloud)
       {
@@ -273,7 +379,7 @@ class EnsensoNode
       {
         boost::function<void(
           const boost::shared_ptr<PairOfImages>&)> f = boost::bind (&EnsensoNode::grabberCallback, this, _1);
-        connection_ = ensenso_ptr_->registerCallback(f);
+        connection2_ = ensenso_ptr_->registerCallback(f);
       }
 
       //      if (was_running)
@@ -281,7 +387,24 @@ class EnsensoNode
       res.success = true;
       return true;
     }
-    
+
+  bool mono_configureStreaming()
+    {
+      bool was_running = ensenso_ptr_->mono_isRunning();
+      if (was_running)
+        ensenso_ptr_->mono_stop();
+      // Disconnect previous connection
+      mono_connection_.disconnect();
+      // Connect new signals
+
+      boost::function<void(const boost::shared_ptr<pcl::PCLImage>&,
+                           const boost::shared_ptr<pcl::PCLImage>&)> f = boost::bind (&EnsensoNode::mono_grabberCallback, this, _1, _2);
+      mono_connection_ = ensenso_ptr_->registerCallback(f);
+
+      return true;
+    }
+
+  
     bool gridSpacingCB (ensenso::GridSpacing::Request& req, ensenso::GridSpacing::Response &res)
     {
       bool was_running = ensenso_ptr_->isRunning();
@@ -299,6 +422,7 @@ class EnsensoNode
       bool was_running = ensenso_ptr_->isRunning();
       if (was_running)
         ensenso_ptr_->stop();
+
       // The grid_spacing value in the request has preference over the decode one
 
       pc_camera_configuration = false;
@@ -325,7 +449,49 @@ class EnsensoNode
         //        ensenso_ptr_->start();
       return true;
     }
-    
+
+    bool initMonoCalibrationCB(ensenso::InitCalibration::Request& req, ensenso::InitCalibration::Response &res)
+    {
+      if (ensenso_ptr_->isRunning())
+        ensenso_ptr_->stop();
+
+      if (ensenso_ptr_->mono_isRunning())
+        ensenso_ptr_->mono_stop();
+
+
+      // The grid_spacing value in the request has preference over the decode one
+
+      pc_camera_configuration = false;
+      if (!ensenso_ptr_->configureCapture (1, true, false, 1, 1, true, 4, false, true, true, 43, false, 40, "Software", true)) {
+        res.success = false;
+        return true;
+      }
+
+      mono_camera_configuration = false;
+      if (!ensenso_ptr_->mono_configureCapture (true, false, 1, 1, 4, false, true, 43, 40, "Software")) {
+        res.success = false;
+        return true;
+      }
+
+      
+      double spacing;
+      if (req.grid_spacing > 0)
+        spacing = req.grid_spacing;
+      else
+        spacing = ensenso_ptr_->getPatternGridSpacing();
+        
+      if (spacing > 0)
+      {
+        res.success = ensenso_ptr_->initMonoCalibration(spacing);
+        res.used_grid_spacing = spacing;
+      }
+      else
+        res.success = false;
+
+      return true;
+    }
+
+  
     bool startStreamingCB(ensenso::SetBool::Request& req, ensenso::SetBool::Response &res)
     {
       if (req.data) {
@@ -334,14 +500,34 @@ class EnsensoNode
           return true;
         }
         pc_camera_configuration = true;
-        ensenso_ptr_->start();
+        res.success = ensenso_ptr_->start_up();
       }
-      else
+      else {
         ensenso_ptr_->stop();
-      res.success = true;
+        res.success = true;
+      }
       return true;
     }
 
+    bool mono_startStreamingCB(ensenso::SetBool::Request& req, ensenso::SetBool::Response &res)
+    {
+      if (req.data) {
+        if (!ensenso_ptr_->mono_configureCapture()) {
+          res.success=false;
+          return true;
+        }
+        mono_camera_configuration = true;
+        res.success = ensenso_ptr_->mono_start_up();
+      }
+      else {
+        ensenso_ptr_->mono_stop();
+        res.success = true;
+      }
+
+      return true;
+    }
+
+  
     bool getSinglePCCB(ensenso::GetPC::Request& req, ensenso::GetPC::Response &res)
     {
       ros::Time  start = ros::Time::now();
@@ -366,6 +552,46 @@ class EnsensoNode
       return true;
     }
 
+    bool getSingleMonoCB(ensenso::GetMono::Request& req, ensenso::GetMono::Response &res)
+    {
+      ros::Time  start = ros::Time::now();
+
+      pcl::PCLImage rectimage;
+      
+      if (!mono_camera_configuration) {
+        if (!ensenso_ptr_->mono_configureCapture()) {
+          res.success=false;
+          return true;
+        }
+        mono_camera_configuration = true;
+      }
+      
+      res.success = ensenso_ptr_->grabSingleMono(rectimage);
+
+      if (res.success) {
+        res.image = *toImageMsg(rectimage);
+        mono_rectified_pub_.publish(res.image);
+      }
+      res.time = (ros::Time::now()-start).toSec();
+      return true;
+    }
+
+  
+
+  void mono_grabberCallback( const boost::shared_ptr<pcl::PCLImage>& rawimage,
+                             const boost::shared_ptr<pcl::PCLImage>& rectimage)
+  {
+      // Get cameras info
+      sensor_msgs::CameraInfo info;
+      ensenso_ptr_->mono_getCameraInfo(info);
+      info.header.frame_id = mono_camera_frame_id_;
+      // Images
+      mono_raw_pub_.publish(*toImageMsg(*rawimage), info);
+      if (!rectimage->data.empty())
+        mono_rectified_pub_.publish(*toImageMsg(*rectimage));
+      
+    }
+
   
   
     void grabberCallback( const boost::shared_ptr<PairOfImages>& rawimages)
@@ -377,10 +603,11 @@ class EnsensoNode
       linfo.header.frame_id = camera_frame_id_;
       rinfo.header.frame_id = camera_frame_id_;
       // Images
-      l_raw_pub_.publish(*toImageMsg(rawimages->first), linfo, ros::Time::now());
-      r_raw_pub_.publish(*toImageMsg(rawimages->second), rinfo, ros::Time::now());
+      l_raw_pub_.publish(*toImageMsg(rawimages->first), linfo);
+      if (!rawimages->second.data.empty())
+        r_raw_pub_.publish(*toImageMsg(rawimages->second), rinfo);
     }
- 
+
 
     void grabberCallback( const boost::shared_ptr<PointCloudXYZ>& cloud,
                           const boost::shared_ptr<PairOfImages>& rectifiedimages)
@@ -417,8 +644,8 @@ class EnsensoNode
       }
       cv::Mat image_mat(pcl_image.height, pcl_image.width, type, image_array);
       std_msgs::Header header;
-      header.frame_id = "world";
-      header.stamp = ros::Time::now();
+      header.frame_id = "";
+      pcl_conversions::fromPCL(pcl_image.header.stamp,header.stamp);
       return cv_bridge::CvImage(header, encoding, image_mat).toImageMsg();
     }
 };
