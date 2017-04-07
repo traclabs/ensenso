@@ -877,7 +877,7 @@ bool pcl::EnsensoGrabber::computeMonoCalibrationMatrix (
       NxLibItem calibParams = mono_camera_[itmLink];
       json = calibParams.asJson (pretty_format);
 
-      //Delete the link inof so the data isn't modified
+      //Delete the link info so the data isn't modified
       calibParams[itmTarget].set("");
       calibParams[itmRotation][itmAngle].set (0);
       
