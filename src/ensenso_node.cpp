@@ -130,8 +130,8 @@ class EnsensoNode
       r_rectified_pub_ = it.advertise("right/image_rect", 1);
 
       //      image_transport::ImageTransport it_mono(nh_);
-      mono_raw_pub_ = it.advertiseCamera("/mono/image_raw", 1);
-      mono_rectified_pub_ = it.advertise("/mono/image_rect", 1);
+      mono_raw_pub_ = it.advertiseCamera("/ueye/image_raw", 1);
+      mono_rectified_pub_ = it.advertise("/ueye/image_rect", 1);
       
       cloud_pub_ = nh_.advertise<sensor_msgs::PointCloud2 >("depth/points", 1); 
       linfo_pub_=nh_.advertise<sensor_msgs::CameraInfo> ("left/camera_info", 1, true); // Latched
