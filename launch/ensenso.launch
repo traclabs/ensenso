@@ -2,7 +2,7 @@
 <launch>
 
   <arg name="serial" default="160875" />
-  <arg name="mono_serial" default="160875" />
+  <arg name="mono_serial" default="0" />
   
   <!-- Ensenso node -->
   <node name="ensenso_node" pkg="ensenso" type="ensenso_node" ns="ensenso" output="screen"> 

@@ -22,6 +22,7 @@ void ensensoExceptionHandling (const NxLibException &ex,
 
 pcl::EnsensoGrabber::EnsensoGrabber () :
   device_open_ (false),
+  mono_device_open_(false),
   tcp_open_ (false),
   running_ (false),
   mono_running_ (false)
