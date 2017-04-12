@@ -108,7 +108,7 @@ class EnsensoNode
       if (!nh_private_.hasParam("camera_frame_id"))
         ROS_WARN_STREAM("Parameter [~camera_frame_id] not found, using default: " << camera_frame_id_);
 
-      nh_private_.param("mono_camera_frame_id", camera_frame_id_, std::string("ueye_optical_frame"));
+      nh_private_.param("mono_camera_frame_id", mono_camera_frame_id_, std::string("ueye_optical_frame"));
       if (!nh_private_.hasParam("mono_camera_frame_id"))
         ROS_WARN_STREAM("Parameter [~mono_camera_frame_id] not found, using default: " << mono_camera_frame_id_);
       // Booleans
@@ -585,8 +585,12 @@ class EnsensoNode
       sensor_msgs::CameraInfo info;
       ensenso_ptr_->mono_getCameraInfo(info);
       info.header.frame_id = mono_camera_frame_id_;
+
       // Images
-      mono_raw_pub_.publish(*toImageMsg(*rawimage), info);
+
+      sensor_msgs::Image img = *toImageMsg(*rawimage);
+      info.header.stamp = img.header.stamp;
+      mono_raw_pub_.publish(img, info);
       if (!rectimage->data.empty())
         mono_rectified_pub_.publish(*toImageMsg(*rectimage));
       
@@ -603,9 +607,14 @@ class EnsensoNode
       linfo.header.frame_id = camera_frame_id_;
       rinfo.header.frame_id = camera_frame_id_;
       // Images
-      l_raw_pub_.publish(*toImageMsg(rawimages->first), linfo);
-      if (!rawimages->second.data.empty())
-        r_raw_pub_.publish(*toImageMsg(rawimages->second), rinfo);
+      sensor_msgs::Image img = *toImageMsg(rawimages->first);
+      linfo.header.stamp = img.header.stamp;
+      l_raw_pub_.publish(img, linfo);
+      if (!rawimages->second.data.empty()) {
+        img = *toImageMsg(rawimages->second);
+        rinfo.header.stamp = img.header.stamp;
+        r_raw_pub_.publish(img, rinfo);
+      }
     }
 
 
@@ -619,8 +628,14 @@ class EnsensoNode
       linfo.header.frame_id = camera_frame_id_;
       rinfo.header.frame_id = camera_frame_id_;
       // Images
-      l_rectified_pub_.publish(toImageMsg(rectifiedimages->first));
-      r_rectified_pub_.publish(toImageMsg(rectifiedimages->second));
+
+      sensor_msgs::Image img = *toImageMsg(rectifiedimages->first);
+      linfo.header.stamp = img.header.stamp;
+      l_rectified_pub_.publish(img);
+      
+      img = *toImageMsg(rectifiedimages->second);
+      rinfo.header.stamp = img.header.stamp;
+      r_rectified_pub_.publish(img);
       // Camera_info
       linfo_pub_.publish(linfo);
       rinfo_pub_.publish(rinfo);

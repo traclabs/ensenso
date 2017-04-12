@@ -1670,7 +1670,7 @@ void pcl::EnsensoGrabber::processPoints ()
         
         if (num_slots<sig_cb_ensenso_point_cloud_images>() > 0) {
           
-          camera_[itmImages][itmPointMap].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);  // Get raw image timestamp
+          camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);  // Get raw image timestamp
           
           rectifiedimages->first.header.stamp = rectifiedimages->second.header.stamp = getPCLStamp (timestamp);
           // rectifiedimages
