@@ -206,7 +206,7 @@ public:
      * @warning A device must be opened and must not be running.
      * @note At least one calibration pattern must have been captured before, use @ref captureCalibrationPattern before */
     bool
-    estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, const bool average=false);
+      estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, double& pose_error, const bool average=false);
 
     bool checkCalibration(double& max_error);
 

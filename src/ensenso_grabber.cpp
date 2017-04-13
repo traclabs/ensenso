@@ -700,7 +700,7 @@ int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
 
 
 
-bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, const bool average) 
+bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, double& pose_error, const bool average) 
 {
   if (!device_open_)
     return (false);
@@ -733,6 +733,7 @@ bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &patte
     if (!jsonTransformationToMatrix (tf.asJson (), pattern_pose))
       return (false);
     pattern_pose.translation () /= 1000.0;  // Convert translation in meters (Ensenso API returns milimeters)
+    pose_error = estimate_pattern_pose.result ()[itmPatterns][num_items-1][itmPoseError].asDouble() / 1000.0;
     return (true);
   }
   catch (NxLibException &ex)

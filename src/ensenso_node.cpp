@@ -214,8 +214,10 @@ class EnsensoNode
       {
         // Pattern pose
         Eigen::Affine3d pattern_pose;
-        ensenso_ptr_->estimateCalibrationPatternPose(pattern_pose);
+        double pose_error;
+        ensenso_ptr_->estimateCalibrationPatternPose(pattern_pose, pose_error);
         tf::poseEigenToMsg(pattern_pose, res.pose);
+        res.pose_error = pose_error;
       }
       //      if (was_running)
       //        ensenso_ptr_->start();
