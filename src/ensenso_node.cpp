@@ -428,7 +428,7 @@ class EnsensoNode
       // The grid_spacing value in the request has preference over the decode one
 
       pc_camera_configuration = false;
-      if (!ensenso_ptr_->configureCapture (1, true, false, 1, 1, true, 4, false, true, true, 43, false, 40, "Software", true)) {
+      if (!ensenso_ptr_->configureCapture (1, true, false, 1, 1, false, 4, false, true, true, 43, false, 80, "Software", true)) {
         res.success = false;
         return true;
       }
@@ -464,13 +464,13 @@ class EnsensoNode
       // The grid_spacing value in the request has preference over the decode one
 
       pc_camera_configuration = false;
-      if (!ensenso_ptr_->configureCapture (1, true, false, 1, 1, true, 4, false, true, true, 43, false, 40, "Software", true)) {
+      if (!ensenso_ptr_->configureCapture (1, true, false, 1, 1, false, 4, false, true, true, 43, false, 80, "Software", true)) {
         res.success = false;
         return true;
       }
 
       mono_camera_configuration = false;
-      if (!ensenso_ptr_->mono_configureCapture (true, false, 1, 1, 4, false, true, 43, 40, "Software")) {
+      if (!ensenso_ptr_->mono_configureCapture ()){ //(true, true, 1, 1, 4, 43, 80, "Software")
         res.success = false;
         return true;
       }

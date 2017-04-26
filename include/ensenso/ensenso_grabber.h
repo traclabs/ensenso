@@ -142,12 +142,10 @@ public:
     bool
       mono_configureCapture (
                       const bool auto_exposure = true,
-                      const bool auto_gain = false,
+                      const bool auto_gain = true,
                       const int bining = 1,
                       const float exposure = 1,
                       const int gain = 4,
-                      const bool gain_boost = false,
-                      const bool hardware_gamma = true,
                       const int pixel_clock = 43,
                       const int target_brightness = 210,
                       const std::string trigger_mode = "Software") const;

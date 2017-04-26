@@ -175,6 +175,7 @@ bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no)
       do {
         NxLibCommand open (cmdOpen);
         open.parameters ()[itmCameras] = mono_camera_[itmSerialNumber].asString ();
+        open.parameters ()[itmLoadCalibration] = true;
         open.execute ();
         mono_serial_=serial_no;
         isOpen=mono_camera_[itmStatus][itmOpen].asBool();
@@ -379,8 +380,6 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
                                            const int bining,
                                            const float exposure,
                                            const int gain,
-                                           const bool gain_boost,
-                                           const bool hardware_gamma,
                                            const int pixel_clock,
                                            const int target_brightness,
                                            const std::string trigger_mode) const
@@ -397,8 +396,6 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
     captureParams[itmBinning].set (bining);
     captureParams[itmExposure].set (exposure);
     captureParams[itmGain].set (gain);
-    captureParams[itmGainBoost].set (gain_boost);
-    captureParams[itmHardwareGamma].set (hardware_gamma);
     captureParams[itmPixelClock].set (pixel_clock);
     captureParams[itmTargetBrightness].set (target_brightness);
     captureParams[itmTriggerMode].set (trigger_mode);
@@ -427,6 +424,11 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
     capture.parameters ()[itmCameras].set(mono_serial_);
     capture.execute ();
 
+    NxLibCommand rect(cmdRectifyImages);
+    rect.parameters ()[itmCameras].set(mono_serial_);
+    rect.execute ();
+
+    
     int width, height, channels, bpe;
     bool isFlt;
           
@@ -642,7 +644,8 @@ int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
     capture.execute();
     
     NxLibCommand collect_pattern (cmdCollectPattern);
-    collect_pattern.parameters ()[itmCameras].set(devices);
+    collect_pattern.parameters ()[itmCameras][0].set(devices[0]);
+    collect_pattern.parameters ()[itmCameras][1].set(devices[1]);
     collect_pattern.parameters ()[itmBuffer].set (true);  // Store the pattern into the buffer
     collect_pattern.execute ();
 
@@ -870,7 +873,8 @@ bool pcl::EnsensoGrabber::computeMonoCalibrationMatrix (
   std::string devices[2]={serial_,mono_serial_};
   try
   {
-    calibrate.parameters()[itmCameras].set(devices);   
+    calibrate.parameters()[itmCameras][0].set(devices[0]);
+    calibrate.parameters()[itmCameras][1].set(devices[1]);   
     calibrate.execute ();  
 
    
@@ -1345,21 +1349,21 @@ bool pcl::EnsensoGrabber::mono_getCameraInfo(sensor_msgs::CameraInfo &cam_info) 
     cam_info.distortion_model = "plumb_bob";
     // Distorsion factors
     cam_info.D.resize(5);
-    for(std::size_t i = 0; i < cam_info.D.size(); ++i)
-      cam_info.D[i] = camera_[itmCalibration][itmDistortion][i].asDouble();
+    //    for(std::size_t i = 0; i < cam_info.D.size(); ++i)
+      //      cam_info.D[i] = camera_[itmCalibration][itmDistortion][i].asDouble();
     // K and R matrices
     for(std::size_t i = 0; i < 3; ++i)
     {
       for(std::size_t j = 0; j < 3; ++j)
-      {
-        cam_info.K[3*i+j] = camera_[itmCalibration][itmCamera][j][i].asDouble();
+        {
+          //    cam_info.K[3*i+j] = camera_[itmCalibration][itmCamera][j][i].asDouble();
       }
     }
     return true;
   }
   catch (NxLibException &ex)
   {
-    ensensoExceptionHandling (ex, "getCameraInfo");
+    ensensoExceptionHandling (ex, "mono_getCameraInfo");
     return false;
   }
 }
@@ -1729,6 +1733,8 @@ void pcl::EnsensoGrabber::processPoints ()
 void pcl::EnsensoGrabber::processMono ()
 {
   NxLibCommand capture(cmdCapture, "mono");
+  NxLibCommand rect(cmdRectifyImages, "mono");
+  
   ros::Rate loop_rate(3);
   
   bool continue_grabbing = mono_running_;
@@ -1737,10 +1743,15 @@ void pcl::EnsensoGrabber::processMono ()
   {
     try
     {
-        capture.parameters()[itmCameras].set(mono_serial_);
-        capture.execute();
         
         if (num_slots<sig_cb_mono_images>()>0) {
+
+          capture.parameters()[itmCameras].set(mono_serial_);
+          capture.execute();        
+          
+          rect.parameters ()[itmCameras].set(mono_serial_);
+          rect.execute ();
+          
           
           boost::shared_ptr<pcl::PCLImage> rawimage (new pcl::PCLImage);
           boost::shared_ptr<pcl::PCLImage> rectimage (new pcl::PCLImage);
