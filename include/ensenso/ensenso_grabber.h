@@ -35,6 +35,7 @@ class PCL_EXPORTS EnsensoGrabber : public Grabber
     typedef std::pair<pcl::PCLImage, pcl::PCLImage> PairOfImages;
 
 public:
+
     /** @cond */
     typedef boost::shared_ptr<EnsensoGrabber> Ptr;
     typedef boost::shared_ptr<const EnsensoGrabber> ConstPtr;
@@ -203,8 +204,8 @@ public:
      * @return true if successful, false otherwise
      * @warning A device must be opened and must not be running.
      * @note At least one calibration pattern must have been captured before, use @ref captureCalibrationPattern before */
-    bool
-      estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, double& pose_error, const bool average=false);
+    bool estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, double& pose_error, const bool average=false);
+    bool mono_estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, double& pose_error, const bool average=false);
 
     bool checkCalibration(double& max_error);
 
@@ -342,6 +343,7 @@ public:
      */
     bool getCameraInfo(std::string cam, sensor_msgs::CameraInfo &cam_info) const;
     bool mono_getCameraInfo(sensor_msgs::CameraInfo &cam_info) const;
+    bool mono_resetCameraInfo(std::vector<double>& vector, bool write_to_device=false) const;
     
     /** @brief Get the Euler angles corresponding to a JSON string (an angle axis transformation)
      * @param[in] json A string containing the angle axis transformation in JSON format

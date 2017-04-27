@@ -36,7 +36,8 @@ add_service_files(
   GetPC.srv
   GetMono.srv
   GetCalError.srv
-)
+  UpdateOffset.srv
+  )
 
 generate_messages(
   DEPENDENCIES

@@ -36,7 +36,7 @@
 #include <ensenso/GetPC.h>
 #include <ensenso/GetMono.h>
 #include <ensenso/GetCalError.h>
-#include <std_srvs/Trigger.h>
+#include <ensenso/UpdateOffset.h>
 
 
 // Typedefs
@@ -64,6 +64,9 @@ class EnsensoNode
     ros::ServiceServer                single_pc_;
     ros::ServiceServer                single_mono_;
     ros::ServiceServer                configure_srv_;
+
+    ros::ServiceServer                reset_link_srv_;
+  
     // Images
     image_transport::CameraPublisher  l_raw_pub_;
     image_transport::CameraPublisher  r_raw_pub_;
@@ -178,6 +181,8 @@ class EnsensoNode
 
       lights_srv_ = nh_.advertiseService("lights", &EnsensoNode::lightsCB, this);
 
+      reset_link_srv_ = nh_.advertiseService("reset_mono_link", &EnsensoNode::mono_resetLink, this);
+      
     }
     
     ~EnsensoNode()
@@ -210,20 +215,25 @@ class EnsensoNode
       }
       res.pattern_count = ensenso_ptr_->captureCalibrationPattern();
       res.success = (res.pattern_count > 0);
-      if (res.success)
-      {
-        // Pattern pose
-        Eigen::Affine3d pattern_pose;
-        double pose_error;
-        ensenso_ptr_->estimateCalibrationPatternPose(pattern_pose, pose_error);
-        tf::poseEigenToMsg(pattern_pose, res.pose);
-        res.pose_error = pose_error;
-      }
-      //      if (was_running)
-      //        ensenso_ptr_->start();
+      if (res.success && res.pattern_count == 1)
+        {
+          // Pattern pose
+          Eigen::Affine3d pattern_pose;
+          double pose_error;
+          ensenso_ptr_->estimateCalibrationPatternPose(pattern_pose, pose_error);
+          tf::poseEigenToMsg(pattern_pose, res.pose);
+          res.pose_error = pose_error;
+        }
       return true;
     }
 
+  bool mono_resetLink(ensenso::UpdateOffset::Request& req, ensenso::UpdateOffset::Response &res)
+    {
+      res.success = ensenso_ptr_->mono_resetCameraInfo(req.vector, req.write_to_device);
+      return true;
+    }
+      
+  
     bool mono_capturePatternCB(ensenso::CapturePattern::Request& req, ensenso::CapturePattern::Response &res)
     {
       if (ensenso_ptr_->isRunning())
@@ -236,6 +246,7 @@ class EnsensoNode
       if (req.clear_buffer)
       {
         if (!ensenso_ptr_->clearCalibrationPatternBuffer ()) {
+          ROS_ERROR("Couldn't clear calibration buffer");
           res.success = false;
           res.pattern_count = 0;
           return true;
@@ -244,9 +255,21 @@ class EnsensoNode
 
       res.pattern_count = ensenso_ptr_->captureMonoCalibrationPattern();
       res.success = (res.pattern_count > 0);
+
+      ROS_INFO_STREAM("PATTERN_COUNT "<<res.pattern_count);
+      
+      if (res.success  && res.pattern_count == 1)
+      {
+        // Pattern pose
+        Eigen::Affine3d pattern_pose;
+        double pose_error;
+        ensenso_ptr_->mono_estimateCalibrationPatternPose(pattern_pose, pose_error);
+        tf::poseEigenToMsg(pattern_pose, res.pose);
+        res.pose_error = pose_error;
+      }
+
       return true;
     }
-
 
   
     bool checkCalibrationCB(ensenso::GetCalError::Request& req, ensenso::GetCalError::Response &res) {
@@ -599,8 +622,7 @@ class EnsensoNode
     }
 
   
-  
-    void grabberCallback( const boost::shared_ptr<PairOfImages>& rawimages)
+  void grabberCallback( const boost::shared_ptr<PairOfImages>& rawimages)
     {
       // Get cameras info
       sensor_msgs::CameraInfo linfo, rinfo;

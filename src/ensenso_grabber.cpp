@@ -1,3 +1,6 @@
+// Notices Pose error: Stereo: 0.8 mm ; Mono to Stereo: 2.3mm
+
+
 #include <pcl/pcl_config.h>
 #include <pcl/exceptions.h>
 #include <pcl/common/io.h>
@@ -293,19 +296,19 @@ std::string pcl::EnsensoGrabber::getName () const
 
 bool pcl::EnsensoGrabber::configureCapture(const uint flexview,
                                            const bool auto_exposure,
-                      const bool auto_gain,
-                      const int bining,
-                      const float exposure,
-                      const bool front_light,
-                      const int gain,
-                      const bool gain_boost,
-                      const bool hardware_gamma,
-                      const bool hdr,
-                      const int pixel_clock,
-                      const bool projector,
-                      const int target_brightness,
-                      const std::string trigger_mode,
-                      const bool use_disparity_map_area_of_interest) const
+                                           const bool auto_gain,
+                                           const int bining,
+                                           const float exposure,
+                                           const bool front_light,
+                                           const int gain,
+                                           const bool gain_boost,
+                                           const bool hardware_gamma,
+                                           const bool hdr,
+                                           const int pixel_clock,
+                                           const bool projector,
+                                           const int target_brightness,
+                                           const std::string trigger_mode,
+                                           const bool use_disparity_map_area_of_interest) const
 {
   if (!device_open_)
     return (false);
@@ -313,21 +316,21 @@ bool pcl::EnsensoGrabber::configureCapture(const uint flexview,
   try
   {
     NxLibItem captureParams = camera_[itmParameters][itmCapture];
-    captureParams[itmFlexView].set ((int)flexview);
-    captureParams[itmAutoExposure].set (auto_exposure);
-    captureParams[itmAutoGain].set (auto_gain);
-    captureParams[itmBinning].set (bining);
-    captureParams[itmExposure].set (exposure);
-    captureParams[itmFrontLight].set (front_light);
-    captureParams[itmGain].set (gain);
-    captureParams[itmGainBoost].set (gain_boost);
-    captureParams[itmHardwareGamma].set (hardware_gamma);
-    captureParams[itmHdr].set (hdr);
-    captureParams[itmPixelClock].set (pixel_clock);
-    captureParams[itmProjector].set (projector);
-    captureParams[itmTargetBrightness].set (target_brightness);
-    captureParams[itmTriggerMode].set (trigger_mode);
-    captureParams[itmUseDisparityMapAreaOfInterest].set (use_disparity_map_area_of_interest);
+    captureParams[itmFlexView] = (int)flexview;
+    captureParams[itmAutoExposure] = auto_exposure;
+    captureParams[itmAutoGain] = auto_gain;
+    captureParams[itmBinning] = bining;
+    captureParams[itmExposure] = exposure;
+    captureParams[itmFrontLight] = front_light;
+    captureParams[itmGain] = gain;
+    captureParams[itmGainBoost] = gain_boost;
+    captureParams[itmHardwareGamma] = hardware_gamma;
+    captureParams[itmHdr] = hdr;
+    captureParams[itmPixelClock] = pixel_clock;
+    captureParams[itmProjector] = projector;
+    captureParams[itmTargetBrightness] = target_brightness;
+    captureParams[itmTriggerMode] = trigger_mode;
+    captureParams[itmUseDisparityMapAreaOfInterest] = use_disparity_map_area_of_interest;
 
    
     int minDisp = -41;  //Max distance: 1.5m
@@ -391,14 +394,14 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
   try
   {
     NxLibItem captureParams = mono_camera_[itmParameters][itmCapture];
-    captureParams[itmAutoExposure].set (auto_exposure);
-    captureParams[itmAutoGain].set (auto_gain);
-    captureParams[itmBinning].set (bining);
-    captureParams[itmExposure].set (exposure);
-    captureParams[itmGain].set (gain);
-    captureParams[itmPixelClock].set (pixel_clock);
-    captureParams[itmTargetBrightness].set (target_brightness);
-    captureParams[itmTriggerMode].set (trigger_mode);
+    captureParams[itmAutoExposure] = auto_exposure;
+    captureParams[itmAutoGain] = auto_gain;
+    captureParams[itmBinning] = bining;
+    captureParams[itmExposure] = exposure;
+    captureParams[itmGain] = gain;
+    captureParams[itmPixelClock] = pixel_clock;
+    captureParams[itmTargetBrightness] = target_brightness;
+    captureParams[itmTriggerMode] = trigger_mode;
 
   }
   catch (NxLibException &ex)
@@ -412,7 +415,7 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
 
 bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
 {
-  if (!device_open_)
+  if (!mono_device_open_)
     return (false);
 
   //  if (running_)
@@ -421,11 +424,11 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
   try
   {
     NxLibCommand capture(cmdCapture);
-    capture.parameters ()[itmCameras].set(mono_serial_);
+    capture.parameters ()[itmCameras] = mono_serial_;
     capture.execute ();
 
     NxLibCommand rect(cmdRectifyImages);
-    rect.parameters ()[itmCameras].set(mono_serial_);
+    rect.parameters ()[itmCameras] = mono_serial_;
     rect.execute ();
 
     
@@ -465,7 +468,7 @@ bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud
   try
   {
     NxLibCommand capture(cmdCapture);
-    capture.parameters ()[itmCameras].set(serial_);
+    capture.parameters ()[itmCameras] = serial_;
     capture.execute ();
     // Stereo matching task
     NxLibCommand (cmdComputeDisparityMap).execute ();
@@ -512,7 +515,7 @@ bool pcl::EnsensoGrabber::initExtrinsicCalibration (const double grid_spacing) c
   {
     if (!clearCalibrationPatternBuffer ())
       return (false);
-    (*root_)[itmParameters][itmPattern][itmGridSpacing].set (grid_spacing);
+    (*root_)[itmParameters][itmPattern][itmGridSpacing] = grid_spacing;
     // GridSize can't be changed, it's protected in the tree
     // With the speckle projector on it is nearly impossible to recognize the pattern
     // (the 3D calibration is based on stereo images, not on 3D depth map)
@@ -540,7 +543,7 @@ bool pcl::EnsensoGrabber::initMonoCalibration (const double grid_spacing) const
   {
     if (!clearCalibrationPatternBuffer ())
       return (false);
-    (*root_)[itmParameters][itmPattern][itmGridSpacing].set (grid_spacing);
+    (*root_)[itmParameters][itmPattern][itmGridSpacing] = grid_spacing;
   }
   catch (NxLibException &ex)
   {
@@ -570,6 +573,9 @@ bool pcl::EnsensoGrabber::clearCalibrationPatternBuffer () const
   return (true);
 }
 
+
+
+
 int pcl::EnsensoGrabber::captureCalibrationPattern () const
 {
   if (!device_open_)
@@ -581,13 +587,18 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
   try
   {
     NxLibCommand capture(cmdCapture);
-    capture.parameters()[itmCameras].set(serial_);
+    capture.parameters()[itmCameras] = serial_;
     capture.execute ();
     
-    NxLibCommand collect_pattern (cmdCollectPattern);
-    collect_pattern.parameters ()[itmCameras].set(serial_);
-    collect_pattern.parameters ()[itmBuffer].set (true);  // Store the pattern into the buffer
-    collect_pattern.execute ();
+  	NxLibCommand collect(cmdCollectPattern);
+    collect.parameters()[itmCameras] = serial_;
+    collect.parameters()[itmDecodeData] = true;
+    collect.parameters()[itmRefinement] = valNone;
+    collect.parameters()[itmReturnAllPattern] = true;
+    collect.parameters()[itmFilter][itmCameras] = serial_;
+    collect.parameters()[itmFilter][itmType] = valStatic;
+    collect.parameters()[itmFilter][itmValue] = true;
+    collect.execute();
 
     if (num_slots<sig_cb_ensenso_raw_images>()>0) {
 
@@ -637,16 +648,21 @@ int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
 
     std::string devices[2]={serial_,mono_serial_};
 
-    capture.parameters()[itmCameras].set(devices[0]);
-    capture.execute();
-
-    capture.parameters()[itmCameras].set(devices[1]);
+    capture.parameters()[itmCameras][0] = devices[0];
+    capture.parameters()[itmCameras][1] = devices[1];
     capture.execute();
     
     NxLibCommand collect_pattern (cmdCollectPattern);
-    collect_pattern.parameters ()[itmCameras][0].set(devices[0]);
-    collect_pattern.parameters ()[itmCameras][1].set(devices[1]);
-    collect_pattern.parameters ()[itmBuffer].set (true);  // Store the pattern into the buffer
+    collect_pattern.parameters()[itmCameras][0] = devices[0];
+    collect_pattern.parameters()[itmCameras][1] = devices[1];
+    collect_pattern.parameters()[itmDecodeData] = true;
+    collect_pattern.parameters()[itmRefinement] = valNone;
+    collect_pattern.parameters()[itmReturnAllPattern] = true;
+    collect_pattern.parameters()[itmFilter][itmCameras][1] = devices[1];
+    collect_pattern.parameters()[itmFilter][itmCameras][0] = devices[0];
+    collect_pattern.parameters()[itmFilter][itmType] = valStatic;
+    collect_pattern.parameters()[itmFilter][itmValue] = true;
+    //collect_pattern.parameters ()[itmBuffer] = true);  // Store the pattern into the buffer
     collect_pattern.execute ();
 
     if (num_slots<sig_cb_ensenso_raw_images>()>0) {
@@ -703,6 +719,60 @@ int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
 
 
 
+bool pcl::EnsensoGrabber::mono_estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, double& pose_error, const bool average) 
+{
+  if (!device_open_ || !mono_device_open_)
+    return (false);
+
+  if (running_)
+    return (false);
+
+  try
+  {
+    int num_items = (*root_)[itmParameters][itmPatternCount].asInt ();
+
+ 	NxLibCommand estimate(cmdEstimatePatternPose);
+
+    estimate.parameters()[itmReprojectionErrorScale] = 100;
+    estimate.parameters()[itmFilter][itmCameras][1] = mono_serial_;
+    estimate.parameters()[itmFilter][itmCameras][0] = serial_;
+    estimate.parameters()[itmFilter][itmType] = valStatic;
+    estimate.parameters()[itmFilter][itmValue] = true;
+    estimate.parameters()[itmAverage] = average;
+    estimate.execute();
+    
+    std::string pose = estimate.result()[itmPatterns][num_items-1][itmPatternPose].asJson();
+    double repError = estimate.result()[itmPatterns][num_items-1][itmReprojectionError].asDouble();
+    double posError = estimate.result()[itmPatterns][num_items-1][itmPoseError].asDouble();
+                
+
+    
+    //    double err;
+    // if (num_items==1) {
+    //   checkCalibration(err);
+    //   estimate_pattern_pose.parameters ()[itmRecalibrate] = true);
+    // }
+    // else
+
+    // if (num_items==1) 
+    //   checkCalibration(err);
+
+    //    NxLibItem tf = estimate_pattern_pose.result ()[itmPatterns][num_items-1][itmPatternPose];
+    // Convert tf into a matrix
+    if (!jsonTransformationToMatrix (pose, pattern_pose))
+      return (false);
+    pattern_pose.translation () /= 1000.0;  // Convert translation in meters (Ensenso API returns milimeters)
+    pose_error = posError / 1000.0;
+    return (true);
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "estimateCalibrationPatternPoses");
+    return (false);
+  }
+}
+
+
 bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &pattern_pose, double& pose_error, const bool average) 
 {
   if (!device_open_)
@@ -713,30 +783,37 @@ bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &patte
 
   try
   {
-    NxLibCommand estimate_pattern_pose (cmdEstimatePatternPose);
-    estimate_pattern_pose.parameters ()[itmAverage].set (average);
 
+    NxLibCommand estimate (cmdEstimatePatternPose);
+    
+    estimate.parameters()[itmReprojectionErrorScale] = 100;
+    estimate.parameters()[itmFilter][itmCameras] = serial_;
+    estimate.parameters()[itmFilter][itmType] = valStatic;
+    estimate.parameters()[itmFilter][itmValue] = true;
+    estimate.parameters()[itmAverage] = average;
+    estimate.execute();
+    
     int num_items = (*root_)[itmParameters][itmPatternCount].asInt ();
+    
+    std::string pose = estimate.result()[itmPatterns][num_items-1][itmPatternPose].asJson();
+    double repError = estimate.result()[itmPatterns][num_items-1][itmReprojectionError].asDouble();
+    double posError = estimate.result()[itmPatterns][num_items-1][itmPoseError].asDouble();
 
-    double err;
+    //    double err;
     // if (num_items==1) {
     //   checkCalibration(err);
-    //   estimate_pattern_pose.parameters ()[itmRecalibrate].set (true);
+    //   estimate_pattern_pose.parameters ()[itmRecalibrate] = true);
     // }
     // else
-    estimate_pattern_pose.parameters ()[itmRecalibrate].set (false);
-
-    estimate_pattern_pose.execute ();
-
     // if (num_items==1) 
     //   checkCalibration(err);
 
-    NxLibItem tf = estimate_pattern_pose.result ()[itmPatterns][num_items-1][itmPatternPose];
+    //    NxLibItem tf = estimate_pattern_pose.result ()[itmPatterns][num_items-1][itmPatternPose];
     // Convert tf into a matrix
-    if (!jsonTransformationToMatrix (tf.asJson (), pattern_pose))
+    if (!jsonTransformationToMatrix (pose, pattern_pose))
       return (false);
     pattern_pose.translation () /= 1000.0;  // Convert translation in meters (Ensenso API returns milimeters)
-    pose_error = estimate_pattern_pose.result ()[itmPatterns][num_items-1][itmPoseError].asDouble() / 1000.0;
+    pose_error = posError /1000;
     return (true);
   }
   catch (NxLibException &ex)
@@ -745,6 +822,7 @@ bool pcl::EnsensoGrabber::estimateCalibrationPatternPose (Eigen::Affine3d &patte
     return (false);
   }
 }
+
 
 bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d> > &robot_poses,
                           std::string &json,
@@ -781,18 +859,18 @@ bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Aff
     }
     // Set Hand-Eye calibration parameters
     if (boost::iequals (setup, "Fixed"))
-      calibrate.parameters ()[itmSetup].set (valFixed);
+      calibrate.parameters ()[itmSetup] = valFixed;
     else
-      calibrate.parameters ()[itmSetup].set (valMoving);
-    calibrate.parameters ()[itmTarget].set (target);
+      calibrate.parameters ()[itmSetup] = valMoving;
+    calibrate.parameters ()[itmTarget] = target;
 
     // Set guess matrix
     if (guess_tf.matrix () != Eigen::Matrix4d::Identity ())
     {
       // Matrix > JSON > Angle axis
-      NxLibItem tf ("/tmpTF");
       if (!matrixTransformationToJson (guess_tf, json))
         return (false);
+      NxLibItem tf ("/tmpTF");
       tf.setJson (json);
 
       // Rotation
@@ -802,14 +880,14 @@ bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Aff
       double z = tf[itmRotation][itmAxis][2].asDouble ();   // Z component of Euler vector
       tf.erase(); // Delete tmpTF node
       
-      calibrate.parameters ()[itmLink][itmRotation][itmAngle].set (theta);
-      calibrate.parameters ()[itmLink][itmRotation][itmAxis][0].set (x);
-      calibrate.parameters ()[itmLink][itmRotation][itmAxis][1].set (y);
-      calibrate.parameters ()[itmLink][itmRotation][itmAxis][2].set (z);
+      calibrate.parameters ()[itmLink][itmRotation][itmAngle] = theta;
+      calibrate.parameters ()[itmLink][itmRotation][itmAxis][0] = x;
+      calibrate.parameters ()[itmLink][itmRotation][itmAxis][1] = y;
+      calibrate.parameters ()[itmLink][itmRotation][itmAxis][2] = z;
       // Translation
-      calibrate.parameters ()[itmLink][itmTranslation][0].set (guess_tf.translation ()[0] * 1000.0);
-      calibrate.parameters ()[itmLink][itmTranslation][1].set (guess_tf.translation ()[1] * 1000.0);
-      calibrate.parameters ()[itmLink][itmTranslation][2].set (guess_tf.translation ()[2] * 1000.0);
+      calibrate.parameters ()[itmLink][itmTranslation][0] = guess_tf.translation ()[0] * 1000.0;
+      calibrate.parameters ()[itmLink][itmTranslation][1] = guess_tf.translation ()[1] * 1000.0;
+      calibrate.parameters ()[itmLink][itmTranslation][2] = guess_tf.translation ()[2] * 1000.0;
     }
 
     // Feed all robot poses into the calibration command
@@ -871,38 +949,22 @@ bool pcl::EnsensoGrabber::computeMonoCalibrationMatrix (
   
   NxLibCommand calibrate (cmdCalibrate);
   std::string devices[2]={serial_,mono_serial_};
+
   try
   {
-    calibrate.parameters()[itmCameras][0].set(devices[0]);
-    calibrate.parameters()[itmCameras][1].set(devices[1]);   
+    calibrate.parameters()[itmCameras][0] = devices[0];
+    calibrate.parameters()[itmCameras][1] = devices[1];   
     calibrate.execute ();  
 
-   
     if (calibrate.successful())
     {
       NxLibItem calibParams = mono_camera_[itmLink];
-      json = calibParams.asJson (pretty_format);
-
-      //Delete the link info so the data isn't modified
-      calibParams[itmTarget].set("");
-      calibParams[itmRotation][itmAngle].set (0);
-      
-      calibParams[itmRotation][itmAxis][0].set (0);
-      calibParams[itmRotation][itmAxis][1].set (0);
-      calibParams[itmRotation][itmAxis][2].set (0);
-      
-      calibParams[itmTranslation][0].set (0);  // Convert in millimeters
-      calibParams[itmTranslation][1].set (0);
-      calibParams[itmTranslation][2].set (0);
-      
+      json = calibParams.asJson (pretty_format);      
       ROS_INFO_STREAM("compute Mono Result: " << std::endl << json);
       return (true);
     }
     else
-      {
-        json.clear ();
-        return (false);
-      }
+      return (false);
   }
   catch (NxLibException &ex)
     {
@@ -1129,16 +1191,16 @@ bool pcl::EnsensoGrabber::setExtrinsicCalibration (const double euler_angle,
   try
   {
     NxLibItem calibParams = camera_[itmLink];
-    calibParams[itmTarget].set (target);
-    calibParams[itmRotation][itmAngle].set (euler_angle);
+    calibParams[itmTarget] = target;
+    calibParams[itmRotation][itmAngle] = euler_angle;
     
-    calibParams[itmRotation][itmAxis][0].set (rotation_axis[0]);
-    calibParams[itmRotation][itmAxis][1].set (rotation_axis[1]);
-    calibParams[itmRotation][itmAxis][2].set (rotation_axis[2]);
+    calibParams[itmRotation][itmAxis][0] = rotation_axis[0];
+    calibParams[itmRotation][itmAxis][1] = rotation_axis[1];
+    calibParams[itmRotation][itmAxis][2] = rotation_axis[2];
     
-    calibParams[itmTranslation][0].set (translation[0] * 1000.0);  // Convert in millimeters
-    calibParams[itmTranslation][1].set (translation[1] * 1000.0);
-    calibParams[itmTranslation][2].set (translation[2] * 1000.0);
+    calibParams[itmTranslation][0] = translation[0] * 1000.0;  // Convert in millimeters
+    calibParams[itmTranslation][1] = translation[1] * 1000.0;
+    calibParams[itmTranslation][2] = translation[2] * 1000.0;
   }
   catch (NxLibException &ex)
   {
@@ -1251,12 +1313,12 @@ double pcl::EnsensoGrabber::getPatternGridSpacing () const
   try
   {
     NxLibCommand capture(cmdCapture);
-    capture.parameters()[itmCameras].set(serial_);
+    capture.parameters()[itmCameras] = serial_;
     capture.execute ();
 
-    collect_pattern.parameters()[itmCameras].set(serial_);
-    collect_pattern.parameters ()[itmBuffer].set (false);
-    collect_pattern.parameters ()[itmDecodeData].set (true);
+    collect_pattern.parameters()[itmCameras] = serial_;
+    collect_pattern.parameters ()[itmBuffer] = false;
+    collect_pattern.parameters ()[itmDecodeData] = true;
     collect_pattern.execute ();
   }
   catch (NxLibException &ex)
@@ -1272,7 +1334,7 @@ bool pcl::EnsensoGrabber::enableFrontLight(const bool enable) const
 {
   try
   {
-    camera_[itmParameters][itmCapture][itmFrontLight].set(enable);
+    camera_[itmParameters][itmCapture][itmFrontLight] = enable;
   }
   catch (NxLibException &ex)
   {
@@ -1286,7 +1348,7 @@ bool pcl::EnsensoGrabber::enableProjector(const bool enable) const
 {
   try
   {
-    camera_[itmParameters][itmCapture][itmProjector].set(enable);
+    camera_[itmParameters][itmCapture][itmProjector] = enable;
   }
   catch (NxLibException &ex)
   {
@@ -1300,6 +1362,26 @@ bool pcl::EnsensoGrabber::getCameraInfo(std::string cam, sensor_msgs::CameraInfo
 {
   try
   {
+
+    double theta = camera_[itmLink][itmRotation][itmAngle].asDouble();
+    double x = camera_[itmLink][itmRotation][itmAxis][0].asDouble();
+    double y = camera_[itmLink][itmRotation][itmAxis][1].asDouble();
+    double z = camera_[itmLink][itmRotation][itmAxis][2].asDouble();
+    // Translation
+    double trans_x = camera_[itmLink][itmTranslation][0].asDouble() /1000.0;
+    double trans_y = camera_[itmLink][itmTranslation][1].asDouble() / 1000.0;
+    double trans_z = camera_[itmLink][itmTranslation][2].asDouble() / 1000.0;
+
+    std::string json;
+    if (!angleAxisTransformationToJson(trans_x,trans_y,trans_z,x,y,z,theta,json))
+      return false;
+
+    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, z, y, x))
+      return false;
+
+    //    ROS_INFO_STREAM_THROTTLE(10,"Link offset from "<<serial_<<" to "<<camera_[itmLink][itmTarget].asString()<<": "<<trans_x<<" "<<trans_y<<" "<<trans_z<<" "<<x<<" "<<y<<" "<<z);
+
+    
     cam_info.width = camera_[itmSensor][itmSize][0].asInt();
     cam_info.height = camera_[itmSensor][itmSize][1].asInt();
     cam_info.distortion_model = "plumb_bob";
@@ -1313,16 +1395,16 @@ bool pcl::EnsensoGrabber::getCameraInfo(std::string cam, sensor_msgs::CameraInfo
       for(std::size_t j = 0; j < 3; ++j)
       {
         cam_info.K[3*i+j] = camera_[itmCalibration][itmMonocular][cam][itmCamera][j][i].asDouble();
-        cam_info.R[3*i+j] = camera_[itmCalibration][itmDynamic][itmStereo][cam][itmRotation][j][i].asDouble();
+        cam_info.R[3*i+j] = camera_[itmCalibration][itmStereo][cam][itmRotation][j][i].asDouble();
       }
     }
-    cam_info.P[0] = camera_[itmCalibration][itmDynamic][itmStereo][cam][itmCamera][0][0].asDouble();
-    cam_info.P[1] = camera_[itmCalibration][itmDynamic][itmStereo][cam][itmCamera][1][0].asDouble();
-    cam_info.P[2] = camera_[itmCalibration][itmDynamic][itmStereo][cam][itmCamera][2][0].asDouble();
+    cam_info.P[0] = camera_[itmCalibration][itmStereo][cam][itmCamera][0][0].asDouble();
+    cam_info.P[1] = camera_[itmCalibration][itmStereo][cam][itmCamera][1][0].asDouble();
+    cam_info.P[2] = camera_[itmCalibration][itmStereo][cam][itmCamera][2][0].asDouble();
     cam_info.P[3] = 0.0;
-    cam_info.P[4] = camera_[itmCalibration][itmDynamic][itmStereo][cam][itmCamera][0][1].asDouble();
-    cam_info.P[5] = camera_[itmCalibration][itmDynamic][itmStereo][cam][itmCamera][1][1].asDouble();
-    cam_info.P[6] = camera_[itmCalibration][itmDynamic][itmStereo][cam][itmCamera][2][1].asDouble();
+    cam_info.P[4] = camera_[itmCalibration][itmStereo][cam][itmCamera][0][1].asDouble();
+    cam_info.P[5] = camera_[itmCalibration][itmStereo][cam][itmCamera][1][1].asDouble();
+    cam_info.P[6] = camera_[itmCalibration][itmStereo][cam][itmCamera][2][1].asDouble();
     cam_info.P[7] = 0.0;
     cam_info.P[10] = 1.0;
     if (cam == "Right")
@@ -1340,23 +1422,97 @@ bool pcl::EnsensoGrabber::getCameraInfo(std::string cam, sensor_msgs::CameraInfo
   }
 }
 
+
+bool pcl::EnsensoGrabber::mono_resetCameraInfo(std::vector<double>& val, bool write_to_device) const
+{
+  
+  try {
+
+    std::string json;
+
+    if (val.size() == 6) {
+      if (!eulerAnglesTransformationToJson(val[0]*1000,val[1]*1000,val[2]*1000,val[3],val[4],val[5],json))
+        return false;
+    }
+    else  
+      if (!eulerAnglesTransformationToJson(0.0175 * 1000, 0.0325 * 1000, -0.01 * 1000,0,0,0,json))
+        return false;
+
+    double euler_angle;
+    Eigen::Vector3d rotation_axis;
+    Eigen::Vector3d translation;
+    
+    if (!jsonTransformationToAngleAxis (json, euler_angle, rotation_axis, translation))
+      return (false);
+
+
+    mono_camera_[itmLink][itmTarget] = serial_;
+
+    mono_camera_[itmLink][itmRotation][itmAngle] = euler_angle;
+
+    mono_camera_[itmLink][itmRotation][itmAxis][0] = rotation_axis[0];
+    mono_camera_[itmLink][itmRotation][itmAxis][1] = rotation_axis[1];
+    mono_camera_[itmLink][itmRotation][itmAxis][2] = rotation_axis[2];
+    
+    mono_camera_[itmLink][itmTranslation][0] = translation[0];  // Convert in millimeters
+    mono_camera_[itmLink][itmTranslation][1] = translation[1];
+    mono_camera_[itmLink][itmTranslation][2] = translation[2];
+
+    ROS_WARN_STREAM("Reset "<<mono_serial_<<" to "<<serial_<<" transform."); 
+
+    if (write_to_device) {
+      NxLibCommand store (cmdStoreCalibration);
+      store.parameters()[itmCameras] = mono_serial_;
+      store.parameters()[itmLink] = true;
+      // Assumes some Cal info
+      store.parameters()[itmCalibration] = true;
+      store.execute();
+    }
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "mono_resetCameraInfo");
+    return false;
+  }
+  return true;
+}
+  
+
 bool pcl::EnsensoGrabber::mono_getCameraInfo(sensor_msgs::CameraInfo &cam_info) const
 {
-  try
-  {
+  try {
+    
+    double theta = mono_camera_[itmLink][itmRotation][itmAngle].asDouble();
+    double x = mono_camera_[itmLink][itmRotation][itmAxis][0].asDouble();
+    double y = mono_camera_[itmLink][itmRotation][itmAxis][1].asDouble();
+    double z = mono_camera_[itmLink][itmRotation][itmAxis][2].asDouble();
+    // Translation
+    double trans_x = mono_camera_[itmLink][itmTranslation][0].asDouble() /1000.0;
+    double trans_y = mono_camera_[itmLink][itmTranslation][1].asDouble() / 1000.0;
+    double trans_z = mono_camera_[itmLink][itmTranslation][2].asDouble() / 1000.0;
+
+    std::string json;
+    if (!angleAxisTransformationToJson(trans_x,trans_y,trans_z,x,y,z,theta,json))
+      return false;
+    
+    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, z, y, x))
+      return false;
+
+    ROS_INFO_STREAM_THROTTLE(10,"Link offset from "<<mono_serial_<<" to "<<mono_camera_[itmLink][itmTarget].asString()<<": "<<trans_x<<" "<<trans_y<<" "<<trans_z<<" "<<x<<" "<<y<<" "<<z);
+    
     cam_info.width = mono_camera_[itmSensor][itmSize][0].asInt();
     cam_info.height = mono_camera_[itmSensor][itmSize][1].asInt();
     cam_info.distortion_model = "plumb_bob";
     // Distorsion factors
     cam_info.D.resize(5);
-    //    for(std::size_t i = 0; i < cam_info.D.size(); ++i)
-      //      cam_info.D[i] = camera_[itmCalibration][itmDistortion][i].asDouble();
+    for(std::size_t i = 0; i < cam_info.D.size(); ++i)
+      cam_info.D[i] = mono_camera_[itmCalibration][itmDistortion][i].asDouble();
     // K and R matrices
     for(std::size_t i = 0; i < 3; ++i)
     {
       for(std::size_t j = 0; j < 3; ++j)
         {
-          //    cam_info.K[3*i+j] = camera_[itmCalibration][itmCamera][j][i].asDouble();
+          cam_info.K[3*i+j] = mono_camera_[itmCalibration][itmCamera][j][i].asDouble();
       }
     }
     return true;
@@ -1382,7 +1538,7 @@ bool pcl::EnsensoGrabber::jsonTransformationToEulerAngles (const std::string &js
   {
     NxLibCommand convert (cmdConvertTransformation);
     convert.parameters ()[itmTransformation].setJson (json, false);
-    convert.parameters ()[itmSplitRotation].set (valXYZ);
+    convert.parameters ()[itmSplitRotation] = valXYZ;
     convert.execute ();
     
     NxLibItem tf = convert.result ()[itmTransformations];
@@ -1516,14 +1672,14 @@ bool pcl::EnsensoGrabber::angleAxisTransformationToJson (const double x,
   try
   {
     NxLibItem tf ("/tmpTF");
-    tf[itmTranslation][0].set (x);
-    tf[itmTranslation][1].set (y);
-    tf[itmTranslation][2].set (z);
+    tf[itmTranslation][0] = x;
+    tf[itmTranslation][1] = y;
+    tf[itmTranslation][2] = z;
     
-    tf[itmRotation][itmAngle].set (alpha);  // Angle of rotation
-    tf[itmRotation][itmAxis][0].set (rx);  // X component of Euler vector
-    tf[itmRotation][itmAxis][1].set (ry);  // Y component of Euler vector
-    tf[itmRotation][itmAxis][2].set (rz);  // Z component of Euler vector
+    tf[itmRotation][itmAngle] = alpha;  // Angle of rotation
+    tf[itmRotation][itmAxis][0] = rx;  // X component of Euler vector
+    tf[itmRotation][itmAxis][1] = ry;  // Y component of Euler vector
+    tf[itmRotation][itmAxis][2] = rz;  // Z component of Euler vector
     
     json = tf.asJson (pretty_format);
     tf.erase ();
@@ -1546,26 +1702,26 @@ bool pcl::EnsensoGrabber::matrixTransformationToJson (const Eigen::Affine3d &mat
     NxLibCommand convert (cmdConvertTransformation);
     
     // Rotation
-    convert.parameters ()[itmTransformation][0][0].set (matrix.linear ().col (0)[0]);
-    convert.parameters ()[itmTransformation][0][1].set (matrix.linear ().col (0)[1]);
-    convert.parameters ()[itmTransformation][0][2].set (matrix.linear ().col (0)[2]);
-    convert.parameters ()[itmTransformation][0][3].set (0.0);
+    convert.parameters ()[itmTransformation][0][0] = matrix.linear ().col (0)[0];
+    convert.parameters ()[itmTransformation][0][1] = matrix.linear ().col (0)[1];
+    convert.parameters ()[itmTransformation][0][2] = matrix.linear ().col (0)[2];
+    convert.parameters ()[itmTransformation][0][3] = 0.0;
     
-    convert.parameters ()[itmTransformation][1][0].set (matrix.linear ().col (1)[0]);
-    convert.parameters ()[itmTransformation][1][1].set (matrix.linear ().col (1)[1]);
-    convert.parameters ()[itmTransformation][1][2].set (matrix.linear ().col (1)[2]);
-    convert.parameters ()[itmTransformation][1][3].set (0.0);
+    convert.parameters ()[itmTransformation][1][0] = matrix.linear ().col (1)[0];
+    convert.parameters ()[itmTransformation][1][1] = matrix.linear ().col (1)[1];
+    convert.parameters ()[itmTransformation][1][2] = matrix.linear ().col (1)[2];
+    convert.parameters ()[itmTransformation][1][3] = 0.0;
     
-    convert.parameters ()[itmTransformation][2][0].set (matrix.linear ().col (2)[0]);
-    convert.parameters ()[itmTransformation][2][1].set (matrix.linear ().col (2)[1]);
-    convert.parameters ()[itmTransformation][2][2].set (matrix.linear ().col (2)[2]);
-    convert.parameters ()[itmTransformation][2][3].set (0.0);
+    convert.parameters ()[itmTransformation][2][0] = matrix.linear ().col (2)[0];
+    convert.parameters ()[itmTransformation][2][1] = matrix.linear ().col (2)[1];
+    convert.parameters ()[itmTransformation][2][2] = matrix.linear ().col (2)[2];
+    convert.parameters ()[itmTransformation][2][3] = 0.0;
     
     // Translation
-    convert.parameters ()[itmTransformation][3][0].set (matrix.translation ()[0]);
-    convert.parameters ()[itmTransformation][3][1].set (matrix.translation ()[1]);
-    convert.parameters ()[itmTransformation][3][2].set (matrix.translation ()[2]);
-    convert.parameters ()[itmTransformation][3][3].set (1.0);
+    convert.parameters ()[itmTransformation][3][0] = matrix.translation ()[0];
+    convert.parameters ()[itmTransformation][3][1] = matrix.translation ()[1];
+    convert.parameters ()[itmTransformation][3][2] = matrix.translation ()[2];
+    convert.parameters ()[itmTransformation][3][3] = 1.0;
     
     convert.execute ();
     json = convert.result ()[itmTransformation].asJson (pretty_format);
@@ -1608,7 +1764,7 @@ void pcl::EnsensoGrabber::processRaw ()
     try
     {
 
-        capture.parameters()[itmCameras].set(serial_);
+        capture.parameters()[itmCameras] = serial_;
         capture.execute();
         raw_initialized_=true;
         
@@ -1746,10 +1902,10 @@ void pcl::EnsensoGrabber::processMono ()
         
         if (num_slots<sig_cb_mono_images>()>0) {
 
-          capture.parameters()[itmCameras].set(mono_serial_);
+          capture.parameters()[itmCameras] = mono_serial_;
           capture.execute();        
           
-          rect.parameters ()[itmCameras].set(mono_serial_);
+          rect.parameters ()[itmCameras] = mono_serial_;
           rect.execute ();
           
           
