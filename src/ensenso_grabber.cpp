@@ -401,8 +401,7 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
     captureParams[itmGain] = gain;
     captureParams[itmPixelClock] = pixel_clock;
     captureParams[itmTargetBrightness] = target_brightness;
-    captureParams[itmTriggerMode] = trigger_mode;
-
+    captureParams[itmTriggerMode] = trigger_mode;   
   }
   catch (NxLibException &ex)
   {
