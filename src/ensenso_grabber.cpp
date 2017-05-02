@@ -367,6 +367,10 @@ bool pcl::EnsensoGrabber::configureCapture(const uint flexview,
     // stereoMatching[itmMinimumDisparity] = minDisp; // set minimum disparity to desired value
     // stereoMatching[itmNumberOfDisparities] = numDisps; // set number of disparity to desired value
 
+    NxLibCommand capture(cmdCapture);
+    capture.parameters()[itmCameras] = serial_;
+    capture.execute ();
+
   }
   catch (NxLibException &ex)
   {
@@ -402,6 +406,11 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
     captureParams[itmPixelClock] = pixel_clock;
     captureParams[itmTargetBrightness] = target_brightness;
     captureParams[itmTriggerMode] = trigger_mode;   
+
+    NxLibCommand capture(cmdCapture);
+    capture.parameters()[itmCameras] = mono_serial_;
+    capture.execute ();
+
   }
   catch (NxLibException &ex)
   {
@@ -589,7 +598,7 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
     capture.parameters()[itmCameras] = serial_;
     capture.execute ();
     
-  	NxLibCommand collect(cmdCollectPattern);
+    NxLibCommand collect(cmdCollectPattern);
     collect.parameters()[itmCameras] = serial_;
     collect.parameters()[itmDecodeData] = true;
     collect.parameters()[itmRefinement] = valNone;
