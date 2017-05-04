@@ -936,12 +936,11 @@ bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Aff
       double error = calibrate.result()[itmReprojectionError].asDouble();
       ROS_WARN("computeCalibrationMatrix Failed. Iterations: %d, Reprojection error: %.2f", iters, error);
       ROS_WARN_STREAM("Result: " << std::endl << calibrate.result()[itmLink].asJson(true));
-      return (false);
     }
     catch (...) {
       ensensoExceptionHandling (ex, "computeCalibrationMatrix");
     } 
-    
+    return false;
   }
 }
 
@@ -1384,10 +1383,10 @@ bool pcl::EnsensoGrabber::getCameraInfo(std::string cam, sensor_msgs::CameraInfo
     if (!angleAxisTransformationToJson(trans_x,trans_y,trans_z,x,y,z,theta,json))
       return false;
 
-    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, z, y, x))
+    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, x, y, z))
       return false;
 
-    //    ROS_INFO_STREAM_THROTTLE(10,"Link offset from "<<serial_<<" to "<<camera_[itmLink][itmTarget].asString()<<": "<<trans_x<<" "<<trans_y<<" "<<trans_z<<" "<<x<<" "<<y<<" "<<z);
+    ROS_INFO_STREAM_THROTTLE(10,"Link offset from "<<serial_<<" to "<<camera_[itmLink][itmTarget].asString()<<": "<<trans_x<<" "<<trans_y<<" "<<trans_z<<" "<<x<<" "<<y<<" "<<z);
 
     
     cam_info.width = camera_[itmSensor][itmSize][0].asInt();
@@ -1503,7 +1502,7 @@ bool pcl::EnsensoGrabber::mono_getCameraInfo(sensor_msgs::CameraInfo &cam_info) 
     if (!angleAxisTransformationToJson(trans_x,trans_y,trans_z,x,y,z,theta,json))
       return false;
     
-    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, z, y, x))
+    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, x, y, z))
       return false;
 
     ROS_INFO_STREAM_THROTTLE(10,"Link offset from "<<mono_serial_<<" to "<<mono_camera_[itmLink][itmTarget].asString()<<": "<<trans_x<<" "<<trans_y<<" "<<trans_z<<" "<<x<<" "<<y<<" "<<z);
@@ -1538,9 +1537,9 @@ bool pcl::EnsensoGrabber::jsonTransformationToEulerAngles (const std::string &js
                                double &x,
                                double &y,
                                double &z,
-                               double &w,
+                               double &r,
                                double &p,
-                               double &r) const
+                               double &w) const
 {
   try
   {
@@ -1553,9 +1552,9 @@ bool pcl::EnsensoGrabber::jsonTransformationToEulerAngles (const std::string &js
     x = tf[0][itmTranslation][0].asDouble ();
     y = tf[0][itmTranslation][1].asDouble ();
     z = tf[0][itmTranslation][2].asDouble ();
-    r = tf[0][itmRotation][itmAngle].asDouble ();  // Roll
+    w = tf[0][itmRotation][itmAngle].asDouble ();  // yaW
     p = tf[1][itmRotation][itmAngle].asDouble ();  // Pitch
-    w = tf[2][itmRotation][itmAngle].asDouble ();  // yaW
+    r = tf[2][itmRotation][itmAngle].asDouble ();  // Roll
     return (true);
   }
 

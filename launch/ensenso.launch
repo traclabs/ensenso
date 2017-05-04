@@ -3,11 +3,13 @@
 
   <arg name="serial" default="160875" />
   <arg name="mono_serial" default="4103137455" />
+  <arg name="sim" default="false"/> 
   
   <!-- Ensenso node -->
   <node name="ensenso_node" pkg="ensenso" type="ensenso_node" ns="ensenso" output="screen"> 
     <param name="serial"          type="string" value="$(arg serial)" />
     <param name="mono_serial"     type="string" value="$(arg mono_serial)" />
+    <param name="sim"     type="boolean" value="$(arg sim)" />
   </node>
 
 </launch>

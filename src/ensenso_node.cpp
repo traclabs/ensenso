@@ -92,6 +92,7 @@ class EnsensoNode
     pcl::EnsensoGrabber::Ptr          ensenso_ptr_;
 
   bool pc_camera_configuration, mono_camera_configuration;
+  bool sim;
   
   public:
      EnsensoNode(): 
@@ -100,6 +101,12 @@ class EnsensoNode
       // Read parameters
       std::string serial, mono_serial;
       pc_camera_configuration = mono_camera_configuration = false;
+      sim = false;
+      
+      nh_private_.param(std::string("sim"), sim, false);
+      if (!nh_private_.hasParam("sim"))
+        ROS_WARN_STREAM("Parameter [~sim] not found, using default: " << sim);
+
       nh_private_.param(std::string("serial"), serial, std::string("0"));
       if (!nh_private_.hasParam("serial"))
         ROS_WARN_STREAM("Parameter [~serial] not found, using default: " << serial);
@@ -143,12 +150,14 @@ class EnsensoNode
       // Initialize Ensenso
       ensenso_ptr_.reset(new pcl::EnsensoGrabber);
       //      ensenso_ptr_->openTcpPort();
-      if (serial != "0") {
-        ensenso_ptr_->openDevice(serial);
-      }
-
-      if (mono_serial != "0") {
-        ensenso_ptr_->mono_openDevice(mono_serial);
+      if (!sim) {
+	if (serial != "0") {
+	  ensenso_ptr_->openDevice(serial);
+	}
+	
+	if (mono_serial != "0") {
+	  ensenso_ptr_->mono_openDevice(mono_serial);
+	}
       }
       
       //      ensenso_ptr_->configureCapture();
@@ -187,8 +196,10 @@ class EnsensoNode
     
     ~EnsensoNode()
     {
-      ensenso_ptr_->closeTcpPort();
-      ensenso_ptr_->closeDevices();
+      if (!sim) {
+	ensenso_ptr_->closeTcpPort();
+	ensenso_ptr_->closeDevices();
+      }
     }
     
     bool lightsCB(ensenso::Lights::Request& req, ensenso::Lights::Response &res)
@@ -202,6 +213,13 @@ class EnsensoNode
   
     bool capturePatternCB(ensenso::CapturePattern::Request& req, ensenso::CapturePattern::Response &res)
     {
+
+      if (sim) {
+	res.success = true;
+	res.pattern_count = 1;
+	return true;
+      }
+      
       bool was_running = ensenso_ptr_->isRunning();
       if (was_running)
         ensenso_ptr_->stop();
@@ -290,6 +308,13 @@ class EnsensoNode
   
     bool computeCalibrationCB(ensenso::ComputeCalibration::Request& req, ensenso::ComputeCalibration::Response &res)
     {
+
+      if (sim) {
+	res.success = true;
+	res.result = req.seed;
+	return true;
+      }
+      
       // Very important to stop the camera before performing the calibration
       bool was_running = ensenso_ptr_->isRunning();
       if (was_running)
@@ -312,36 +337,44 @@ class EnsensoNode
         ROS_INFO("Calibration computation finished");
         // Populate the response
         res.success = true;
-        Eigen::Affine3d eigen_result;
-        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
-        eigen_result.translation () /= 1000.0;  // Convert translation to meters (Ensenso API returns milimeters)
-        eigen_result=eigen_result.inverse();
-        tf::poseEigenToMsg(eigen_result, res.result);
+        //Eigen::Affine3d eigen_result;
+	//        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
+	double x,y,z,r,p,w;
+	ensenso_ptr_->jsonTransformationToEulerAngles(result, x, y, z, r, p, w);
+	x /= 1000;
+	y /= 1000;
+	z /= 1000;
 
-        tf::Transform T;
-        tf::transformEigenToTF(eigen_result, T);
-       
-        double r,p,y;
+	tf::Transform T;
+	T.setOrigin(tf::Vector3(x,y,z));
+	T.getBasis().setRPY(r,p,w);
 
-        T.getBasis().getRPY(r,p,y);
+	T=T.inverse();
+	
+        tf::poseTFToMsg(T, res.result);
+
+        T.getBasis().getRPY(r,p,w);
         ROS_INFO_STREAM("X,Y,Z: "<< T.getOrigin().x()<<" "<<T.getOrigin().y()<<" "<<T.getOrigin().z());
-        ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<y);
-        
+        ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<w);
+
+	ROS_INFO_STREAM(res.result);
+	
         res.reprojection_error = error;
         res.iterations = iters;
-        if (req.store_to_eeprom)
-        {
-          if (!ensenso_ptr_->clearEEPROMExtrinsicCalibration()) {
-            ROS_WARN("Could not reset extrinsic calibration");
-            res.success = false;
-          }
-          if (!ensenso_ptr_->storeEEPROMExtrinsicCalibration()) {
-            ROS_WARN("Could not store new extrinsic calibration");
-            res.success = false;
-          }
-          else
-            ROS_INFO("Calibration stored into the EEPROM");
-        }
+	//Ignore eeprom stuff with sterero to robot
+        // if (req.store_to_eeprom)
+        // {
+        //   if (!ensenso_ptr_->clearEEPROMExtrinsicCalibration()) {
+        //     ROS_WARN("Could not reset extrinsic calibration");
+        //     res.success = false;
+        //   }
+        //   if (!ensenso_ptr_->storeEEPROMExtrinsicCalibration()) {
+        //     ROS_WARN("Could not store new extrinsic calibration");
+        //     res.success = false;
+        //   }
+        //   else
+        //     ROS_INFO("Calibration stored into the EEPROM");
+        // }
       }
       //      if (was_running)
       //        ensenso_ptr_->start();
@@ -364,20 +397,22 @@ class EnsensoNode
         ROS_INFO("Calibration computation finished");
 
         res.success = true;
-        Eigen::Affine3d eigen_result;
-        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
-        eigen_result.translation () /= 1000.0;  // Convert translation to meters (Ensenso API returns milimeters)
-        eigen_result=eigen_result.inverse();
-        tf::poseEigenToMsg(eigen_result, res.result);
+	//        Eigen::Affine3d eigen_result;
+	//        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
+	double x,y,z,r,p,w;
+	ensenso_ptr_->jsonTransformationToEulerAngles(result, x,y,z,r,p,w);
 
         tf::Transform T;
-        tf::transformEigenToTF(eigen_result, T);
-       
-        double r,p,y;
+	T.setOrigin(tf::Vector3(x/1000,y/1000,z/1000));
+	T.getBasis().setRPY(r,p,w);
 
-        T.getBasis().getRPY(r,p,y);
+	T=T.inverse();
+	
+        tf::poseTFToMsg(T, res.result);
+
+        T.getBasis().getRPY(r,p,w);
         ROS_INFO_STREAM("X,Y,Z: "<< T.getOrigin().x()<<" "<<T.getOrigin().y()<<" "<<T.getOrigin().z());
-        ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<y);
+        ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<w);
         
       }
       return true;
@@ -444,6 +479,12 @@ class EnsensoNode
     
     bool initCalibrationCB(ensenso::InitCalibration::Request& req, ensenso::InitCalibration::Response &res)
     {
+      if (sim) {
+	res.used_grid_spacing = req.grid_spacing;
+	res.success = true;
+	return true;
+      }
+      
       bool was_running = ensenso_ptr_->isRunning();
       if (was_running)
         ensenso_ptr_->stop();
