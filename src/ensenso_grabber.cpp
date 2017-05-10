@@ -968,6 +968,14 @@ bool pcl::EnsensoGrabber::computeMonoCalibrationMatrix (
       NxLibItem calibParams = mono_camera_[itmLink];
       json = calibParams.asJson (pretty_format);      
       ROS_INFO_STREAM("compute Mono Result: " << std::endl << json);
+
+      NxLibCommand store (cmdStoreCalibration);
+      store.parameters()[itmCameras] = mono_serial_;
+      store.parameters()[itmLink] = true;
+      // Assumes some Cal info
+      store.parameters()[itmCalibration] = true;
+      store.execute();
+      
       return (true);
     }
     else

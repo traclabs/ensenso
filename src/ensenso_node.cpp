@@ -215,9 +215,9 @@ class EnsensoNode
     {
 
       if (sim) {
-	res.success = true;
-	res.pattern_count = 1;
-	return true;
+        res.success = true;
+        res.pattern_count = 1;
+        return true;
       }
       
       bool was_running = ensenso_ptr_->isRunning();
@@ -254,6 +254,13 @@ class EnsensoNode
   
     bool mono_capturePatternCB(ensenso::CapturePattern::Request& req, ensenso::CapturePattern::Response &res)
     {
+      if (sim) {
+        res.success = true;
+        res.pattern_count = 1;
+        return true;
+      }
+
+
       if (ensenso_ptr_->isRunning())
         ensenso_ptr_->stop();
 
@@ -310,9 +317,9 @@ class EnsensoNode
     {
 
       if (sim) {
-	res.success = true;
-	res.result = req.seed;
-	return true;
+        res.success = true;
+        res.result = req.seed;
+        return true;
       }
       
       // Very important to stop the camera before performing the calibration
@@ -337,27 +344,26 @@ class EnsensoNode
         ROS_INFO("Calibration computation finished");
         // Populate the response
         res.success = true;
-        //Eigen::Affine3d eigen_result;
-	//        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
-	double x,y,z,r,p,w;
-	ensenso_ptr_->jsonTransformationToEulerAngles(result, x, y, z, r, p, w);
-	x /= 1000;
-	y /= 1000;
-	z /= 1000;
 
-	tf::Transform T;
-	T.setOrigin(tf::Vector3(x,y,z));
-	T.getBasis().setRPY(r,p,w);
-
-	T=T.inverse();
-	
+        double x,y,z,r,p,w;
+        ensenso_ptr_->jsonTransformationToEulerAngles(result, x, y, z, r, p, w);
+        x /= 1000;
+        y /= 1000;
+        z /= 1000;
+        
+        tf::Transform T;
+        T.setOrigin(tf::Vector3(x,y,z));
+        T.getBasis().setRPY(r,p,w);
+        
+        T=T.inverse();
+        
         tf::poseTFToMsg(T, res.result);
-
+        
         T.getBasis().getRPY(r,p,w);
         ROS_INFO_STREAM("X,Y,Z: "<< T.getOrigin().x()<<" "<<T.getOrigin().y()<<" "<<T.getOrigin().z());
         ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<w);
-
-	ROS_INFO_STREAM(res.result);
+        
+        ROS_INFO_STREAM(res.result);
 	
         res.reprojection_error = error;
         res.iterations = iters;
@@ -383,6 +389,13 @@ class EnsensoNode
 
     bool computeMonoCalibrationCB(ensenso::ComputeCalibration::Request& req, ensenso::ComputeCalibration::Response &res)
     {
+
+      if (sim) {
+        res.success = true;
+        res.result = req.seed;
+        return true;
+      }
+
       // Very important to stop the camera before performing the calibration
       if (ensenso_ptr_->isRunning())
         ensenso_ptr_->stop();
@@ -397,22 +410,23 @@ class EnsensoNode
         ROS_INFO("Calibration computation finished");
 
         res.success = true;
-	//        Eigen::Affine3d eigen_result;
-	//        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
-	double x,y,z,r,p,w;
-	ensenso_ptr_->jsonTransformationToEulerAngles(result, x,y,z,r,p,w);
 
+        double x,y,z,r,p,w;
+        ensenso_ptr_->jsonTransformationToEulerAngles(result, x,y,z,r,p,w);
+        
         tf::Transform T;
-	T.setOrigin(tf::Vector3(x/1000,y/1000,z/1000));
-	T.getBasis().setRPY(r,p,w);
-
-	T=T.inverse();
-	
+        T.setOrigin(tf::Vector3(x/1000,y/1000,z/1000));
+        T.getBasis().setRPY(r,p,w);
+        
+        T=T.inverse();
+        
         tf::poseTFToMsg(T, res.result);
-
+        
         T.getBasis().getRPY(r,p,w);
         ROS_INFO_STREAM("X,Y,Z: "<< T.getOrigin().x()<<" "<<T.getOrigin().y()<<" "<<T.getOrigin().z());
         ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<w);
+
+        ROS_INFO_STREAM(res.result);
         
       }
       return true;
@@ -480,9 +494,9 @@ class EnsensoNode
     bool initCalibrationCB(ensenso::InitCalibration::Request& req, ensenso::InitCalibration::Response &res)
     {
       if (sim) {
-	res.used_grid_spacing = req.grid_spacing;
-	res.success = true;
-	return true;
+        res.used_grid_spacing = req.grid_spacing;
+        res.success = true;
+        return true;
       }
       
       bool was_running = ensenso_ptr_->isRunning();
@@ -518,6 +532,13 @@ class EnsensoNode
 
     bool initMonoCalibrationCB(ensenso::InitCalibration::Request& req, ensenso::InitCalibration::Response &res)
     {
+
+      if (sim) {
+        res.used_grid_spacing = req.grid_spacing;
+        res.success = true;
+        return true;
+      }
+
       if (ensenso_ptr_->isRunning())
         ensenso_ptr_->stop();
 
