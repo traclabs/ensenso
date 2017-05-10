@@ -409,13 +409,15 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
 
     NxLibCommand capture(cmdCapture);
     capture.parameters()[itmCameras] = mono_serial_;
+    capture.parameters()[itmTimeout] = 2000;
     capture.execute ();
+
 
   }
   catch (NxLibException &ex)
   {
     ensensoExceptionHandling (ex, "mono_configureCapture");
-    return (false);
+    return false;
   }
   return (true);
 }
@@ -433,6 +435,7 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
   {
     NxLibCommand capture(cmdCapture);
     capture.parameters ()[itmCameras] = mono_serial_;
+    capture.parameters()[itmTimeout] = 2000;
     capture.execute ();
 
     NxLibCommand rect(cmdRectifyImages);
@@ -658,6 +661,7 @@ int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
 
     capture.parameters()[itmCameras][0] = devices[0];
     capture.parameters()[itmCameras][1] = devices[1];
+    capture.parameters()[itmTimeout] = 2000;
     capture.execute();
     
     NxLibCommand collect_pattern (cmdCollectPattern);
@@ -666,8 +670,8 @@ int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
     collect_pattern.parameters()[itmDecodeData] = true;
     collect_pattern.parameters()[itmRefinement] = valNone;
     collect_pattern.parameters()[itmReturnAllPattern] = true;
-    collect_pattern.parameters()[itmFilter][itmCameras][1] = devices[1];
     collect_pattern.parameters()[itmFilter][itmCameras][0] = devices[0];
+    collect_pattern.parameters()[itmFilter][itmCameras][1] = devices[1];
     collect_pattern.parameters()[itmFilter][itmType] = valStatic;
     collect_pattern.parameters()[itmFilter][itmValue] = true;
     //collect_pattern.parameters ()[itmBuffer] = true);  // Store the pattern into the buffer
@@ -1918,6 +1922,7 @@ void pcl::EnsensoGrabber::processMono ()
         if (num_slots<sig_cb_mono_images>()>0) {
 
           capture.parameters()[itmCameras] = mono_serial_;
+          capture.parameters()[itmTimeout] = 2000;
           capture.execute();        
           
           rect.parameters ()[itmCameras] = mono_serial_;
