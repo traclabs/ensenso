@@ -145,7 +145,7 @@ public:
                       const bool auto_exposure = false,
                       const bool auto_gain = false,
                       const int bining = 1,
-                      const float exposure = 80,
+                      const float exposure = 100,
                       const int gain = 1,
                       const int pixel_clock = 24,
                       const int target_brightness = 210,

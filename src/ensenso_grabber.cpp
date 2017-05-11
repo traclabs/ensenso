@@ -316,13 +316,15 @@ bool pcl::EnsensoGrabber::configureCapture(const uint flexview,
   try
   {
     NxLibItem captureParams = camera_[itmParameters][itmCapture];
-    captureParams[itmFlexView] = (int)flexview;
     captureParams[itmAutoExposure] = auto_exposure;
     captureParams[itmAutoGain] = auto_gain;
+    captureParams[itmFlexView] = (int)flexview;
     captureParams[itmBinning] = bining;
-    captureParams[itmExposure] = exposure;
+    if (!auto_exposure)
+      captureParams[itmExposure] = exposure;
     captureParams[itmFrontLight] = front_light;
-    captureParams[itmGain] = gain;
+    if (!auto_gain)
+      captureParams[itmGain] = gain;
     captureParams[itmGainBoost] = gain_boost;
     captureParams[itmHardwareGamma] = hardware_gamma;
     captureParams[itmHdr] = hdr;
@@ -401,12 +403,14 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
     captureParams[itmAutoExposure] = auto_exposure;
     captureParams[itmAutoGain] = auto_gain;
     captureParams[itmBinning] = bining;
-    captureParams[itmExposure] = exposure;
-    captureParams[itmGain] = gain;
+    if (!auto_exposure)
+      captureParams[itmExposure] = exposure;
+    if (!auto_gain)
+      captureParams[itmGain] = gain;
     captureParams[itmPixelClock] = pixel_clock;
     captureParams[itmTargetBrightness] = target_brightness;
     captureParams[itmTriggerMode] = trigger_mode;   
-
+    
     NxLibCommand capture(cmdCapture);
     capture.parameters()[itmCameras] = mono_serial_;
     capture.parameters()[itmTimeout] = 2000;
@@ -600,7 +604,37 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
     NxLibCommand capture(cmdCapture);
     capture.parameters()[itmCameras] = serial_;
     capture.execute ();
-    
+
+    if (num_slots<sig_cb_ensenso_raw_images>()>0) {
+
+      boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
+      
+      int width, height, channels, bpe;
+      bool isFlt;
+      
+      double timestamp;
+      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+      
+      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      rawimages->first.header.stamp = rawimages->second.header.stamp = getPCLStamp (timestamp);
+      rawimages->first.width = rawimages->second.width = width;
+      rawimages->first.height = rawimages->second.height = height;
+      rawimages->first.data.resize (width * height * sizeof(float));
+      rawimages->second.data.resize (width * height * sizeof(float));
+      rawimages->first.encoding = rawimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
+      camera_[itmImages][itmRaw][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
+      camera_[itmImages][itmRaw][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
+      raw_images_signal_->operator () (rawimages);
+    }    
+
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "captureCalibrationPattern");
+    return (-1);
+  }
+
+  try{
     NxLibCommand collect(cmdCollectPattern);
     collect.parameters()[itmCameras] = serial_;
     collect.parameters()[itmDecodeData] = true;
@@ -631,9 +665,7 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
       camera_[itmImages][itmWithOverlay][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
       camera_[itmImages][itmWithOverlay][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
       raw_images_signal_->operator () (rawimages);
-    }
-
-    
+    }    
   }
   catch (NxLibException &ex)
   {
@@ -653,17 +685,68 @@ int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
   if (running_ || mono_running_)
     return (-1);
 
+  std::string devices[2]={serial_,mono_serial_};
   try
   {
     NxLibCommand capture (cmdCapture);
-
-    std::string devices[2]={serial_,mono_serial_};
 
     capture.parameters()[itmCameras][0] = devices[0];
     capture.parameters()[itmCameras][1] = devices[1];
     capture.parameters()[itmTimeout] = 2000;
     capture.execute();
-    
+
+    if (num_slots<sig_cb_ensenso_raw_images>()>0) {
+
+      boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
+      
+      int width, height, channels, bpe;
+      bool isFlt;
+      
+      double timestamp;
+      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+      
+      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      rawimages->first.header.stamp = getPCLStamp (timestamp);
+      rawimages->first.width = width;
+      rawimages->first.height = height;
+      rawimages->first.data.resize (width * height * sizeof(float));
+      rawimages->first.encoding = getOpenCVType (channels, bpe, isFlt);
+      camera_[itmImages][itmRaw][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
+      raw_images_signal_->operator () (rawimages);
+    }
+
+    if (num_slots<sig_cb_mono_images>()>0) {
+          
+      boost::shared_ptr<pcl::PCLImage> rawimage (new pcl::PCLImage);
+      boost::shared_ptr<pcl::PCLImage> rectimage (new pcl::PCLImage);
+      int width, height, channels, bpe;
+      bool isFlt;
+      
+      double timestamp;
+      mono_camera_[itmImages][itmRaw].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+      
+      mono_camera_[itmImages][itmRaw].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      rawimage->header.stamp = getPCLStamp (timestamp);
+      rawimage->width = width;
+      rawimage->height = height;
+      rawimage->data.resize (width * height * sizeof(float));
+      rawimage->encoding = getOpenCVType (channels, bpe, isFlt);
+      
+      mono_camera_[itmImages][itmRaw].getBinaryData (rawimage->data.data (), rawimage->data.size (), 0, 0);
+      
+      mono_images_signal_->operator () (rawimage,rectimage);
+    }
+
+
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "captureMonoCalibrationPattern");
+    return (-1);
+  }
+
+  
+  try{
     NxLibCommand collect_pattern (cmdCollectPattern);
     collect_pattern.parameters()[itmCameras][0] = devices[0];
     collect_pattern.parameters()[itmCameras][1] = devices[1];
@@ -1328,17 +1411,74 @@ double pcl::EnsensoGrabber::getPatternGridSpacing () const
     return (-1);
   if (running_)
     return (-1);
-  NxLibCommand collect_pattern (cmdCollectPattern);
+
+  double rc = -1;
+  
   try
   {
     NxLibCommand capture(cmdCapture);
     capture.parameters()[itmCameras] = serial_;
     capture.execute ();
 
+    if (num_slots<sig_cb_ensenso_raw_images>()>0) {
+
+      boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
+      
+      int width, height, channels, bpe;
+      bool isFlt;
+      
+      double timestamp;
+      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+      
+      camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      rawimages->first.header.stamp = rawimages->second.header.stamp = getPCLStamp (timestamp);
+      rawimages->first.width = rawimages->second.width = width;
+      rawimages->first.height = rawimages->second.height = height;
+      rawimages->first.data.resize (width * height * sizeof(float));
+      rawimages->second.data.resize (width * height * sizeof(float));
+      rawimages->first.encoding = rawimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
+      camera_[itmImages][itmRaw][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
+      camera_[itmImages][itmRaw][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
+      raw_images_signal_->operator () (rawimages);
+    }    
+
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "getPatternGridSpacing");
+    return (-1);
+  }
+
+  try {
+    NxLibCommand collect_pattern (cmdCollectPattern);
     collect_pattern.parameters()[itmCameras] = serial_;
     collect_pattern.parameters ()[itmBuffer] = false;
     collect_pattern.parameters ()[itmDecodeData] = true;
     collect_pattern.execute ();
+    rc = collect_pattern.result()[itmGridSpacing].asDouble();
+    
+    if (num_slots<sig_cb_ensenso_raw_images>()>0) {
+
+      boost::shared_ptr<PairOfImages> rawimages (new PairOfImages);
+      
+      int width, height, channels, bpe;
+      bool isFlt;
+      
+      double timestamp;
+      camera_[itmImages][itmWithOverlay][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+      
+      camera_[itmImages][itmWithOverlay][itmLeft].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      rawimages->first.header.stamp = rawimages->second.header.stamp = getPCLStamp (timestamp);
+      rawimages->first.width = rawimages->second.width = width;
+      rawimages->first.height = rawimages->second.height = height;
+      rawimages->first.data.resize (width * height * sizeof(float));
+      rawimages->second.data.resize (width * height * sizeof(float));
+      rawimages->first.encoding = rawimages->second.encoding = getOpenCVType (channels, bpe, isFlt);
+      camera_[itmImages][itmWithOverlay][itmLeft].getBinaryData (rawimages->first.data.data (), rawimages->first.data.size (), 0, 0);
+      camera_[itmImages][itmWithOverlay][itmRight].getBinaryData (rawimages->second.data.data (), rawimages->second.data.size (), 0, 0);
+      raw_images_signal_->operator () (rawimages);
+    }    
+
   }
   catch (NxLibException &ex)
   {
@@ -1346,7 +1486,7 @@ double pcl::EnsensoGrabber::getPatternGridSpacing () const
     return (-1);
   }
   
-  return collect_pattern.result()[itmGridSpacing].asDouble();
+  return rc;
 }
 
 bool pcl::EnsensoGrabber::enableFrontLight(const bool enable) const

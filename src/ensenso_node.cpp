@@ -261,10 +261,12 @@ class EnsensoNode
       }
 
 
+      bool was_running = ensenso_ptr_->mono_isRunning();
+      
       if (ensenso_ptr_->isRunning())
         ensenso_ptr_->stop();
 
-      if (ensenso_ptr_->mono_isRunning())
+      if (was_running)
         ensenso_ptr_->mono_stop();
 
       
@@ -293,6 +295,10 @@ class EnsensoNode
         res.pose_error = pose_error;
       }
 
+      if (was_running)
+        ensenso_ptr_->mono_start_up();
+
+      
       return true;
     }
 
@@ -542,7 +548,9 @@ class EnsensoNode
       if (ensenso_ptr_->isRunning())
         ensenso_ptr_->stop();
 
-      if (ensenso_ptr_->mono_isRunning())
+      
+      bool was_running = ensenso_ptr_->mono_isRunning();
+      if (was_running)
         ensenso_ptr_->mono_stop();
 
 
@@ -575,6 +583,9 @@ class EnsensoNode
       else
         res.success = false;
 
+      if (was_running)
+        ensenso_ptr_->mono_stop();
+            
       return true;
     }
 
@@ -582,6 +593,10 @@ class EnsensoNode
     bool startStreamingCB(ensenso::SetBool::Request& req, ensenso::SetBool::Response &res)
     {
       if (req.data) {
+        if (ensenso_ptr_->isRunning()) {
+          res.success=true;
+          return true;
+        }
         if (!ensenso_ptr_->configureCapture()) {
           res.success=false;
           return true;
@@ -598,7 +613,12 @@ class EnsensoNode
 
     bool mono_startStreamingCB(ensenso::SetBool::Request& req, ensenso::SetBool::Response &res)
     {
+      
       if (req.data) {
+        if (ensenso_ptr_->mono_isRunning()) {
+          res.success=true;
+          return true;
+        }
         if (!ensenso_ptr_->mono_configureCapture()) {
           res.success=false;
           return true;
