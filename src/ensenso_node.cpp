@@ -191,6 +191,9 @@ class EnsensoNode
       lights_srv_ = nh_.advertiseService("lights", &EnsensoNode::lightsCB, this);
 
       reset_link_srv_ = nh_.advertiseService("reset_mono_link", &EnsensoNode::mono_resetLink, this);
+
+      mono_camera_configuration=false;
+      pc_camera_configuration=false;
       
     }
     
@@ -640,6 +643,11 @@ class EnsensoNode
       ros::Time  start = ros::Time::now();
       pcl::PointCloud<pcl::PointXYZ> pc;
 
+      bool was_running = ensenso_ptr_->isRunning();
+      if (was_running)
+        ensenso_ptr_->stop();
+
+      
       if (!pc_camera_configuration) {
         if (!ensenso_ptr_->configureCapture()) {
           res.success=false;
@@ -656,6 +664,7 @@ class EnsensoNode
         cloud_pub_.publish(res.cloud);
       }
       res.time = (ros::Time::now()-start).toSec();
+      
       return true;
     }
 
@@ -664,6 +673,10 @@ class EnsensoNode
       ros::Time  start = ros::Time::now();
 
       pcl::PCLImage rectimage;
+
+      bool was_running = ensenso_ptr_->mono_isRunning();
+      if (was_running)
+        ensenso_ptr_->mono_stop();
       
       if (!mono_camera_configuration) {
         if (!ensenso_ptr_->mono_configureCapture()) {

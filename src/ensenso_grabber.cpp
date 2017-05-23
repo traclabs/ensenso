@@ -1019,6 +1019,7 @@ bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Aff
   {
     try
     {
+      ensensoExceptionHandling (ex, "computeCalibrationMatrix");
       int iters = calibrate.result()[itmIterations].asInt();
       double error = calibrate.result()[itmReprojectionError].asDouble();
       ROS_WARN("computeCalibrationMatrix Failed. Iterations: %d, Reprojection error: %.2f", iters, error);
