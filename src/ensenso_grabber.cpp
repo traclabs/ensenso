@@ -1536,7 +1536,7 @@ bool pcl::EnsensoGrabber::getCameraInfo(std::string cam, sensor_msgs::CameraInfo
     if (!angleAxisTransformationToJson(trans_x,trans_y,trans_z,x,y,z,theta,json))
       return false;
 
-    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, x, y, z))
+    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, z, y, x))
       return false;
 
     ROS_INFO_STREAM_THROTTLE(10,"Link offset from "<<serial_<<" to "<<camera_[itmLink][itmTarget].asString()<<": "<<trans_x<<" "<<trans_y<<" "<<trans_z<<" "<<x<<" "<<y<<" "<<z);
@@ -1655,7 +1655,7 @@ bool pcl::EnsensoGrabber::mono_getCameraInfo(sensor_msgs::CameraInfo &cam_info) 
     if (!angleAxisTransformationToJson(trans_x,trans_y,trans_z,x,y,z,theta,json))
       return false;
     
-    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, x, y, z))
+    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, z, y, x))
       return false;
 
     ROS_INFO_STREAM_THROTTLE(10,"Link offset from "<<mono_serial_<<" to "<<mono_camera_[itmLink][itmTarget].asString()<<": "<<trans_x<<" "<<trans_y<<" "<<trans_z<<" "<<x<<" "<<y<<" "<<z);
@@ -1690,9 +1690,9 @@ bool pcl::EnsensoGrabber::jsonTransformationToEulerAngles (const std::string &js
                                double &x,
                                double &y,
                                double &z,
-                               double &r,
+                               double &w,
                                double &p,
-                               double &w) const
+                               double &r) const
 {
   try
   {
@@ -1705,9 +1705,9 @@ bool pcl::EnsensoGrabber::jsonTransformationToEulerAngles (const std::string &js
     x = tf[0][itmTranslation][0].asDouble ();
     y = tf[0][itmTranslation][1].asDouble ();
     z = tf[0][itmTranslation][2].asDouble ();
-    w = tf[0][itmRotation][itmAngle].asDouble ();  // yaW
+    r = tf[0][itmRotation][itmAngle].asDouble ();  // Roll
     p = tf[1][itmRotation][itmAngle].asDouble ();  // Pitch
-    r = tf[2][itmRotation][itmAngle].asDouble ();  // Roll
+    w = tf[2][itmRotation][itmAngle].asDouble ();  // yaW
     return (true);
   }
 

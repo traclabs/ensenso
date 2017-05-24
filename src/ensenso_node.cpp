@@ -354,23 +354,21 @@ class EnsensoNode
         // Populate the response
         res.success = true;
 
-        double x,y,z,r,p,w;
-        ensenso_ptr_->jsonTransformationToEulerAngles(result, x, y, z, r, p, w);
-        x /= 1000;
-        y /= 1000;
-        z /= 1000;
-        
+        Eigen::Affine3d eigen_result;
+        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
+        eigen_result.translation () /= 1000.0;  // Convert translation to meters (Ensenso API returns milimeters)
+
         tf::Transform T;
-        T.setOrigin(tf::Vector3(x,y,z));
-        T.getBasis().setRPY(r,p,w);
+        tf::poseEigenToTF(eigen_result, T);
         
         T=T.inverse();
         
         tf::poseTFToMsg(T, res.result);
         
+        double r,p,w;
         T.getBasis().getRPY(r,p,w);
         ROS_INFO_STREAM("X,Y,Z: "<< T.getOrigin().x()<<" "<<T.getOrigin().y()<<" "<<T.getOrigin().z());
-        ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<w);
+        ROS_INFO_STREAM("R,P,W: "<<r<<" "<<p<<" "<<w);
         
         ROS_INFO_STREAM(res.result);
 	
@@ -420,20 +418,22 @@ class EnsensoNode
 
         res.success = true;
 
-        double x,y,z,r,p,w;
-        ensenso_ptr_->jsonTransformationToEulerAngles(result, x,y,z,r,p,w);
-        
+        Eigen::Affine3d eigen_result;
+        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
+        eigen_result.translation () /= 1000.0;  // Convert translation to meters (Ensenso API returns milimeters)
+
         tf::Transform T;
-        T.setOrigin(tf::Vector3(x/1000,y/1000,z/1000));
-        T.getBasis().setRPY(r,p,w);
+        tf::poseEigenToTF(eigen_result, T);
         
         T=T.inverse();
         
         tf::poseTFToMsg(T, res.result);
         
+        double r,p,w;
+
         T.getBasis().getRPY(r,p,w);
         ROS_INFO_STREAM("X,Y,Z: "<< T.getOrigin().x()<<" "<<T.getOrigin().y()<<" "<<T.getOrigin().z());
-        ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<w);
+        ROS_INFO_STREAM("R,P,W: "<<r<<" "<<p<<" "<<w);
 
         ROS_INFO_STREAM(res.result);
         
