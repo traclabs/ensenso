@@ -136,7 +136,7 @@ public:
                       const bool hdr = true,
                       const int pixel_clock = 24,
                       const bool projector = true,
-                      const int target_brightness = 210,
+                      const int target_brightness = 80,
                       const std::string trigger_mode = "Software",
                       const bool use_disparity_map_area_of_interest = true) const;
 
