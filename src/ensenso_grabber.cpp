@@ -34,7 +34,6 @@ pcl::EnsensoGrabber::EnsensoGrabber () :
   point_cloud_images_signal_ = createSignal<sig_cb_ensenso_point_cloud_images> ();
 
   mono_images_signal_ = createSignal<sig_cb_mono_images> ();
-
   
   PCL_INFO ("Initialising nxLib\n");
 
