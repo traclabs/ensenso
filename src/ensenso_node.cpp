@@ -363,7 +363,8 @@ class EnsensoNode
         ROS_INFO("Calibration computation finished");
         // Populate the response
         res.success = true;
-
+        
+        
         double x,y,z,r,p,w;
         ensenso_ptr_->jsonTransformationToEulerAngles(result, x, y, z, r, p, w);
         x /= 1000;
@@ -379,11 +380,27 @@ class EnsensoNode
         tf::poseTFToMsg(T, res.result);
         
         T.getBasis().getRPY(r,p,w);
+        ROS_ERROR_STREAM("Euler answer:");
         ROS_INFO_STREAM("X,Y,Z: "<< T.getOrigin().x()<<" "<<T.getOrigin().y()<<" "<<T.getOrigin().z());
         ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<w);
         
+
+        Eigen::Affine3d eigen_result;
+        ensenso_ptr_->jsonTransformationToMatrix(result, eigen_result);
+        eigen_result.translation () /= 1000.0;  // Convert translation to meters (Ensenso API returns milimeters)
+        tf::poseEigenToTF(eigen_result, T);
+
+        T=T.inverse();
+        
+        //tf::poseTFToMsg(T, res.result);
+        
+        T.getBasis().getRPY(r,p,w);
+        ROS_ERROR_STREAM("Eigen answer:");
+        ROS_INFO_STREAM("X,Y,Z: "<< T.getOrigin().x()<<" "<<T.getOrigin().y()<<" "<<T.getOrigin().z());
+        ROS_INFO_STREAM("R,P,Y: "<<r<<" "<<p<<" "<<w);
+
         ROS_INFO_STREAM(res.result);
-	
+        
         res.reprojection_error = error;
         res.iterations = iters;
 	//Ignore eeprom stuff with sterero to robot
