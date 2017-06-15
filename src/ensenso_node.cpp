@@ -716,6 +716,7 @@ class EnsensoNode
       res.success = ensenso_ptr_->grabSingleMono(rectimage);
 
       if (res.success) {
+        
         res.image = *toImageMsg(rectimage);
         mono_rectified_pub_.publish(res.image);
       }
@@ -804,10 +805,13 @@ class EnsensoNode
         encoding = "bgr8";
       }
       cv::Mat image_mat(pcl_image.height, pcl_image.width, type, image_array);
+      cv::Mat new_image;
       std_msgs::Header header;
       header.frame_id = "";
       pcl_conversions::fromPCL(pcl_image.header.stamp,header.stamp);
-      return cv_bridge::CvImage(header, encoding, image_mat).toImageMsg();
+      //      cv::flip(image_mat, new_image, -1);
+      image_mat.copyTo(new_image);
+      return cv_bridge::CvImage(header, encoding, new_image).toImageMsg();
     }
 };
 
