@@ -147,29 +147,37 @@ class EnsensoNode
       linfo_pub_=nh_.advertise<sensor_msgs::CameraInfo> ("left/camera_info", 1, true); // Latched
       rinfo_pub_=nh_.advertise<sensor_msgs::CameraInfo> ("right/camera_info", 1, true);
 
-      if (!sim) {
-        std::string command="sudo service ueyeethdrc stop && sudo service ueyeethdrc start";
-        int rc = system(command.c_str());
+      bool started;
+
+      do {
+        started=true;
+        ROS_WARN_STREAM_THROTTLE(1.0,"Trying to open uEye devices");
         
-        if (rc != 0) {
-          ROS_FATAL("Could not initialize Ueye Ethernet service");
-          return;
+        if (!sim) {
+          std::string command="sudo service ueyeethdrc stop && sudo service ueyeethdrc start";
+          int rc = system(command.c_str());
+          
+          if (rc != 0) {
+            ROS_FATAL("Could not initialize Ueye Ethernet service");
+            return;
+          }
+          ros::Duration(0.5).sleep();
         }
-      }
       
-      // Initialize Ensenso
-      ensenso_ptr_.reset(new pcl::EnsensoGrabber);
-      //      ensenso_ptr_->openTcpPort();
-      if (!sim) {
-        if (serial != "0") {
-          ensenso_ptr_->openDevice(serial);
+        // Initialize Ensenso
+        ensenso_ptr_.reset(new pcl::EnsensoGrabber);
+        //      ensenso_ptr_->openTcpPort();
+        if (!sim) {
+          if (serial != "0") {
+            started &= ensenso_ptr_->openDevice(serial);
+          }
+          
+          if (mono_serial != "0") {
+            started &= ensenso_ptr_->mono_openDevice(mono_serial);
+          }
         }
+      } while (!started);
         
-        if (mono_serial != "0") {
-          ensenso_ptr_->mono_openDevice(mono_serial);
-        }
-      }
-      
       //      ensenso_ptr_->configureCapture();
       //      ensenso_ptr_->enableProjector(projector);
       //      ensenso_ptr_->enableFrontLight(front_light);
