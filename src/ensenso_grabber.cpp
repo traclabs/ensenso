@@ -334,26 +334,26 @@ bool pcl::EnsensoGrabber::configureCapture(const uint flexview,
     captureParams[itmUseDisparityMapAreaOfInterest] = use_disparity_map_area_of_interest;
 
    
-    int minDisp = -41;  //Max distance: 1.5m
-    int numDisps = 96; //Min distance: 0.63m 
+    int minDisp = -36;  //Max distance: 1.4m
+    int numDisps = 32; //Min distance: 0.995m 
 
     NxLibItem stereoMatching = camera_[itmParameters][itmDisparityMap][itmStereoMatching];
  
     stereoMatching[itmMinimumDisparity] = minDisp; // set minimum disparity to desired value
     stereoMatching[itmNumberOfDisparities] = numDisps; // set number of disparity to desired value
-    stereoMatching[itmShadowingThreshold] = 2; // I think
+    // stereoMatching[itmShadowingThreshold] = 1; // I think
 
 
-    NxLibItem postProcessing = camera_[itmParameters][itmDisparityMap][itmPostProcessing];
+    // NxLibItem postProcessing = camera_[itmParameters][itmDisparityMap][itmPostProcessing];
 
-    postProcessing[itmUniquenessRatio]=0;
+    // postProcessing[itmUniquenessRatio]=0;
 
-    postProcessing[itmMedianFilterRadius]=2; // Not sure about this
+    // postProcessing[itmMedianFilterRadius]=2; // Not sure about this
     
-    postProcessing[itmSpeckleRemoval][itmComponentThreshold]=1;
-    postProcessing[itmSpeckleRemoval][itmRegionSize]=1000;
+    // postProcessing[itmSpeckleRemoval][itmComponentThreshold]=1;
+    // postProcessing[itmSpeckleRemoval][itmRegionSize]=1000;
 
-    postProcessing[itmFilling][itmRegionSize]=0; //off
+    // postProcessing[itmFilling][itmRegionSize]=0; //off
 
     //    NxLibCommand (cmdCapture).execute ();
     
@@ -483,10 +483,13 @@ bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud
   {
     NxLibCommand capture(cmdCapture);
     capture.parameters ()[itmCameras] = serial_;
+    ROS_INFO_STREAM("Grabbing image");
     capture.execute ();
     // Stereo matching task
+    ROS_INFO_STREAM("Computing disparity");
     NxLibCommand (cmdComputeDisparityMap).execute ();
     // Convert disparity map into XYZ data for each pixel
+    ROS_INFO_STREAM("Computing pc");
     NxLibCommand (cmdComputePointMap).execute ();
     // Get info about the computed point map and copy it into a std::vector
     double timestamp;

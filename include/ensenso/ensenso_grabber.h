@@ -124,7 +124,7 @@ public:
      * @note See [Capture tree item](http://www.ensenso.de/manual/index.html?capture.htm) for more
      * details about the parameters. */
     bool
-      configureCapture (const uint flexview = 2,
+      configureCapture (const uint flexview = 0,
                       const bool auto_exposure = true,
                       const bool auto_gain = false,
                       const int bining = 1,

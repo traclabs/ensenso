@@ -152,18 +152,7 @@ class EnsensoNode
       do {
         started=true;
         ROS_WARN_STREAM_THROTTLE(1.0,"Trying to open uEye devices");
-        
-        if (!sim) {
-          std::string command="sudo service ueyeethdrc stop && sudo service ueyeethdrc start";
-          int rc = system(command.c_str());
-          
-          if (rc != 0) {
-            ROS_FATAL("Could not initialize Ueye Ethernet service");
-            return;
-          }
-          ros::Duration(0.5).sleep();
-        }
-      
+              
         // Initialize Ensenso
         ensenso_ptr_.reset(new pcl::EnsensoGrabber);
         //      ensenso_ptr_->openTcpPort();
@@ -175,6 +164,23 @@ class EnsensoNode
           if (mono_serial != "0") {
             started &= ensenso_ptr_->mono_openDevice(mono_serial);
           }
+          
+          if (!started) {
+            std::string command="sudo service ueyeethdrc stop";
+            int rc = system(command.c_str());
+
+            command="sudo service ueyeethdrc start";
+            rc = system(command.c_str());
+            
+#if 0 
+            if (rc != 0) {
+              ROS_FATAL("Could not initialize Ueye Ethernet service");
+              return;
+            }
+#endif
+            ros::Duration(1).sleep();
+          }
+          
         }
       } while (!started);
         
@@ -675,6 +681,8 @@ class EnsensoNode
   
     bool getSinglePCCB(ensenso::GetPC::Request& req, ensenso::GetPC::Response &res)
     {
+      ROS_INFO_STREAM("Ensenso requesting PC");
+      
       ros::Time  start = ros::Time::now();
       pcl::PointCloud<pcl::PointXYZ> pc;
 
@@ -690,16 +698,19 @@ class EnsensoNode
         }
         pc_camera_configuration = true;
       }
-      
-      res.success = ensenso_ptr_->grabSingleCloud(pc);
 
+      ROS_INFO_STREAM("Ensenso grabbing PC");
+      res.success = ensenso_ptr_->grabSingleCloud(pc);
+      ROS_INFO_STREAM("Ensenso PC grabbed");
+      
       if (res.success) {
         pc.header.frame_id = camera_frame_id_;
         pcl::toROSMsg(pc, res.cloud);
         cloud_pub_.publish(res.cloud);
       }
       res.time = (ros::Time::now()-start).toSec();
-      
+
+      ROS_INFO_STREAM("Ensenso PC done");
       return true;
     }
 
