@@ -8,7 +8,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <tf_conversions/tf_eigen.h>
 #include <tf/transform_listener.h>
-
+#include <std_srvs/Trigger.h>
 // Conversions
 #include <eigen_conversions/eigen_msg.h>
 
@@ -62,6 +62,8 @@ class EnsensoNode
     ros::ServiceServer                start_srv_;
     ros::ServiceServer                mono_start_srv_;
     ros::ServiceServer                single_pc_;
+    ros::ServiceServer                single_pc_trigger_;
+    ros::ServiceServer                triggered_pc_;
     ros::ServiceServer                single_mono_;
     ros::ServiceServer                configure_srv_;
 
@@ -153,17 +155,6 @@ class EnsensoNode
         started=true;
         ROS_WARN_STREAM_THROTTLE(1.0,"Trying to open uEye devices");
         
-        if (!sim) {
-          std::string command="sudo service ueyeethdrc stop && sudo service ueyeethdrc start";
-          int rc = system(command.c_str());
-          
-          if (rc != 0) {
-            ROS_FATAL("Could not initialize Ueye Ethernet service");
-            return;
-          }
-          ros::Duration(0.5).sleep();
-        }
-      
         // Initialize Ensenso
         ensenso_ptr_.reset(new pcl::EnsensoGrabber);
         //      ensenso_ptr_->openTcpPort();
@@ -175,6 +166,18 @@ class EnsensoNode
           if (mono_serial != "0") {
             started &= ensenso_ptr_->mono_openDevice(mono_serial);
           }
+          
+          if (started)
+            break;
+          
+          std::string command="sudo service ueyeethdrc stop && sudo service ueyeethdrc start";
+          int rc = system(command.c_str());
+          
+          if (rc != 0) {
+            ROS_FATAL("Could not initialize Ueye Ethernet service");
+            return;
+          }
+          ros::Duration(0.5).sleep();
         }
       } while (!started);
         
@@ -201,6 +204,8 @@ class EnsensoNode
       start_srv_ = nh_.advertiseService("start_stereo_streaming", &EnsensoNode::startStreamingCB, this);
       mono_start_srv_ = nh_.advertiseService("start_mono_streaming", &EnsensoNode::mono_startStreamingCB, this);
       single_pc_ = nh_.advertiseService("get_single_pc", &EnsensoNode::getSinglePCCB, this);
+      single_pc_trigger_ = nh_.advertiseService("trigger_single_pc", &EnsensoNode::triggerSinglePCCB, this);
+      triggered_pc_ = nh_.advertiseService("get_triggered_pc", &EnsensoNode::getTriggeredPCCB, this);
       single_mono_ = nh_.advertiseService("get_single_mono", &EnsensoNode::getSingleMonoCB, this);
 
       configure_srv_ = nh_.advertiseService("configure_streaming", &EnsensoNode::configureStreamingCB, this);
@@ -703,6 +708,47 @@ class EnsensoNode
       return true;
     }
 
+
+  bool triggerSinglePCCB(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response &res)
+    {
+
+      bool was_running = ensenso_ptr_->isRunning();
+      if (was_running)
+        ensenso_ptr_->stop();
+
+      
+      if (!pc_camera_configuration) {
+        if (!ensenso_ptr_->configureCapture()) {
+          res.success=false;
+          return true;
+        }
+        pc_camera_configuration = true;
+      }
+      
+      res.success = ensenso_ptr_->triggerStereoImage();
+      
+      return true;
+    }
+
+
+    bool getTriggeredPCCB(ensenso::GetPC::Request& req, ensenso::GetPC::Response &res)
+    {
+      ros::Time  start = ros::Time::now();
+
+      pcl::PointCloud<pcl::PointXYZ> pc;
+      res.success = ensenso_ptr_->grabTriggeredPC(pc);
+
+      if (res.success) {
+        pc.header.frame_id = camera_frame_id_;
+        pcl::toROSMsg(pc, res.cloud);
+        cloud_pub_.publish(res.cloud);
+      }
+      res.time = (ros::Time::now()-start).toSec();
+      
+      return true;
+    }
+
+  
     bool getSingleMonoCB(ensenso::GetMono::Request& req, ensenso::GetMono::Response &res)
     {
       ros::Time  start = ros::Time::now();

@@ -160,6 +160,13 @@ public:
     grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud);
 
     bool
+    grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud);
+
+    bool
+    triggerStereoImage ();
+
+    
+    bool
       grabSingleMono (pcl::PCLImage& image);
 
     

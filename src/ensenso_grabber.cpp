@@ -517,6 +517,77 @@ bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud
   }
 }
 
+
+
+bool pcl::EnsensoGrabber::triggerStereoImage ()
+{
+  if (!device_open_)
+    return (false);
+
+  //  if (running_)
+  //    return (false);
+
+  try
+  {
+    NxLibCommand capture(cmdCapture);
+    capture.parameters ()[itmCameras] = serial_;
+    capture.execute ();
+  }
+  catch (NxLibException &ex)
+    {
+      ensensoExceptionHandling (ex, "triggerStereoImage");
+      return (false);
+    }
+  return true;
+}
+
+
+bool pcl::EnsensoGrabber::grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud)
+{
+  if (!device_open_)
+    return (false);
+
+  //  if (running_)
+  //    return (false);
+
+  try
+  {
+    // Stereo matching task
+    NxLibCommand (cmdComputeDisparityMap).execute ();
+    // Convert disparity map into XYZ data for each pixel
+    NxLibCommand (cmdComputePointMap).execute ();
+    // Get info about the computed point map and copy it into a std::vector
+    double timestamp;
+    std::vector<float> pointMap;
+    int width, height;
+    camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);  // Get raw image timestamp
+    camera_[itmImages][itmPointMap].getBinaryDataInfo (&width, &height, 0, 0, 0, 0);
+    camera_[itmImages][itmPointMap].getBinaryData (pointMap, 0);
+    // Copy point cloud and convert in meters
+    cloud.header.stamp = getPCLStamp (timestamp);
+    cloud.resize (height * width);
+    cloud.width = width;
+    cloud.height = height;
+    cloud.is_dense = false;
+    // Copy data in point cloud (and convert milimeters in meters)
+    for (size_t i = 0; i < pointMap.size (); i += 3)
+    {
+      cloud.points[i / 3].x = pointMap[i] / 1000.0;
+      cloud.points[i / 3].y = pointMap[i + 1] / 1000.0;
+      cloud.points[i / 3].z = pointMap[i + 2] / 1000.0;
+    }
+    return (true);
+  }
+  catch (NxLibException &ex)
+  {
+    ensensoExceptionHandling (ex, "grabTriggeredPC");
+    return (false);
+  }
+}
+
+
+
+
 bool pcl::EnsensoGrabber::initExtrinsicCalibration (const double grid_spacing) const
 {
   if (!device_open_)
