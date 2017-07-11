@@ -169,8 +169,13 @@ class EnsensoNode
           
           if (started)
             break;
-          
-          std::string command="sudo service ueyeethdrc stop && sudo service ueyeethdrc start";
+
+          ROS_INFO_STREAM("Restarting ueyeethdrc service");
+
+          ensenso_ptr_->closeTcpPort();
+          ensenso_ptr_->closeDevices();
+
+          std::string command="sudo service ueyeethdrc stop && sleep 1 && sudo service ueyeethdrc start && sleep 1";
           int rc = system(command.c_str());
           
           if (rc != 0) {
