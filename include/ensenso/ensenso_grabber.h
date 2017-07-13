@@ -133,7 +133,7 @@ public:
                       const int gain = 4,
                       const bool gain_boost = false,
                       const bool hardware_gamma = true,
-                      const bool hdr = true,
+                      const bool hdr = false,
                       const int pixel_clock = 24,
                       const bool projector = true,
                       const int target_brightness = 80,

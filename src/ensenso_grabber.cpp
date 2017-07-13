@@ -342,7 +342,7 @@ bool pcl::EnsensoGrabber::configureCapture(const uint flexview,
     stereoMatching[itmMinimumDisparity] = minDisp; // set minimum disparity to desired value
     stereoMatching[itmNumberOfDisparities] = numDisps; // set number of disparity to desired value
     stereoMatching[itmShadowingThreshold] = 2; // I think
-
+    stereoMatching[itmPadding] = false;
 
     NxLibItem postProcessing = camera_[itmParameters][itmDisparityMap][itmPostProcessing];
 
