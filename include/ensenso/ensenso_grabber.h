@@ -134,7 +134,7 @@ public:
                       const bool gain_boost = false,
                       const bool hardware_gamma = true,
                       const bool hdr = false,
-                      const int pixel_clock = 24,
+                      const int pixel_clock = 68,
                       const bool projector = true,
                       const int target_brightness = 80,
                       const std::string trigger_mode = "Software",
@@ -147,7 +147,7 @@ public:
                       const int bining = 1,
                       const float exposure = 100,
                       const int gain = 1,
-                      const int pixel_clock = 24,
+                      const int pixel_clock = 68,
                       const int target_brightness = 210,
                       const std::string trigger_mode = "Software") const;
 

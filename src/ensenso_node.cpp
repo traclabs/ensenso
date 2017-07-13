@@ -222,6 +222,11 @@ class EnsensoNode
 
       mono_camera_configuration=false;
       pc_camera_configuration=false;
+
+      pcl::PointCloud<pcl::PointXYZ> pc;
+      ensenso_ptr_->grabSingleCloud(pc);
+      pcl::PCLImage img;
+      ensenso_ptr_->grabSingleMono(img);
       
     }
     
@@ -560,7 +565,7 @@ class EnsensoNode
       // The grid_spacing value in the request has preference over the decode one
 
       pc_camera_configuration = false;
-      if (!ensenso_ptr_->configureCapture (1, true, false, 1, 1, false, 4, false, true, true, 43, false, 80, "Software", true)) {
+      if (!ensenso_ptr_->configureCapture (1, true, false, 1, 1, false, 4, false, true, true, 68, false, 80, "Software", true)) {
         res.success = false;
         return true;
       }
@@ -605,7 +610,7 @@ class EnsensoNode
       // The grid_spacing value in the request has preference over the decode one
 
       pc_camera_configuration = false;
-      if (!ensenso_ptr_->configureCapture (1, true, false, 1, 1, false, 4, false, true, true, 43, false, 80, "Software", true)) {
+      if (!ensenso_ptr_->configureCapture (1, true, false, 1, 1, false, 4, false, true, true, 68, false, 80, "Software", true)) {
         res.success = false;
         return true;
       }
@@ -773,7 +778,7 @@ class EnsensoNode
       }
       
       res.success = ensenso_ptr_->grabSingleMono(rectimage);
-
+      
       if (res.success) {
         
         res.image = *toImageMsg(rectimage);

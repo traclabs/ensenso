@@ -436,11 +436,13 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
 
   try
   {
+    
     NxLibCommand capture(cmdCapture);
     capture.parameters ()[itmCameras] = mono_serial_;
     capture.parameters()[itmTimeout] = 2000;
     capture.execute ();
 
+    
     NxLibCommand rect(cmdRectifyImages);
     rect.parameters ()[itmCameras] = mono_serial_;
     rect.execute ();
