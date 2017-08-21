@@ -709,7 +709,7 @@ int pcl::EnsensoGrabber::captureCalibrationPattern () const
   try{
     NxLibCommand collect(cmdCollectPattern);
     collect.parameters()[itmCameras] = serial_;
-    collect.parameters()[itmDecodeData] = true;
+    collect.parameters()[itmDecodeData] = false;
     collect.parameters()[itmRefinement] = valNone;
     collect.parameters()[itmReturnAllPattern] = true;
     collect.parameters()[itmFilter][itmCameras] = serial_;
@@ -822,7 +822,7 @@ int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
     NxLibCommand collect_pattern (cmdCollectPattern);
     collect_pattern.parameters()[itmCameras][0] = devices[0];
     collect_pattern.parameters()[itmCameras][1] = devices[1];
-    collect_pattern.parameters()[itmDecodeData] = true;
+    collect_pattern.parameters()[itmDecodeData] = false;
     collect_pattern.parameters()[itmRefinement] = valNone;
     collect_pattern.parameters()[itmReturnAllPattern] = true;
     collect_pattern.parameters()[itmFilter][itmCameras][0] = devices[0];
@@ -1526,7 +1526,7 @@ double pcl::EnsensoGrabber::getPatternGridSpacing () const
     NxLibCommand collect_pattern (cmdCollectPattern);
     collect_pattern.parameters()[itmCameras] = serial_;
     collect_pattern.parameters ()[itmBuffer] = false;
-    collect_pattern.parameters ()[itmDecodeData] = true;
+    collect_pattern.parameters ()[itmDecodeData] = false;
     collect_pattern.execute ();
     rc = collect_pattern.result()[itmGridSpacing].asDouble();
     
