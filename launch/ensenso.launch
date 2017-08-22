@@ -3,7 +3,13 @@
 
   <arg name="serial" default="160875" />
   <arg name="mono_serial" default="4103137455" />
-  <arg name="sim" default="false"/> 
+
+<!--   
+  <arg name="serial" default="171312" />
+  <arg name="mono_serial" default="4103137456" />
+ -->  
+
+ <arg name="sim" default="false"/> 
   
   <!-- Ensenso node -->
   <node name="ensenso_node" pkg="ensenso" type="ensenso_node" ns="ensenso" output="screen"> 
