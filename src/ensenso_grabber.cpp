@@ -412,7 +412,7 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
     
     NxLibCommand capture(cmdCapture);
     capture.parameters()[itmCameras] = mono_serial_;
-    capture.parameters()[itmTimeout] = 2000;
+    capture.parameters()[itmTimeout] = 3000;
     capture.execute ();
 
 
@@ -439,7 +439,7 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
     
     NxLibCommand capture(cmdCapture);
     capture.parameters ()[itmCameras] = mono_serial_;
-    capture.parameters()[itmTimeout] = 2000;
+    capture.parameters()[itmTimeout] = 3000;
     capture.execute ();
 
     
@@ -764,7 +764,7 @@ int pcl::EnsensoGrabber::captureMonoCalibrationPattern () const
 
     capture.parameters()[itmCameras][0] = devices[0];
     capture.parameters()[itmCameras][1] = devices[1];
-    capture.parameters()[itmTimeout] = 2000;
+    capture.parameters()[itmTimeout] = 3000;
     capture.execute();
 
     if (num_slots<sig_cb_ensenso_raw_images>()>0) {
@@ -2135,7 +2135,7 @@ void pcl::EnsensoGrabber::processMono ()
         if (num_slots<sig_cb_mono_images>()>0) {
 
           capture.parameters()[itmCameras] = mono_serial_;
-          capture.parameters()[itmTimeout] = 2000;
+          capture.parameters()[itmTimeout] = 3000;
           capture.execute();        
           
           rect.parameters ()[itmCameras] = mono_serial_;

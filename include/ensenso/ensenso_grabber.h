@@ -145,8 +145,8 @@ public:
                       const bool auto_exposure = false,
                       const bool auto_gain = false,
                       const int bining = 1,
-                      const float exposure = 100,
-                      const int gain = 1,
+                      const float exposure = 200,
+                      const int gain = 2,
                       const int pixel_clock = 68,
                       const int target_brightness = 210,
                       const std::string trigger_mode = "Software") const;
