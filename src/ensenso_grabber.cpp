@@ -452,8 +452,7 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
     bool isFlt;
           
     double timestamp;
-    mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
-          
+    mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);          
     mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
     image.header.stamp = getPCLStamp (timestamp);
     image.width = width;
@@ -473,7 +472,7 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
 }
 
 
-bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud)
+bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud, pcl::PCLImage& image)
 {
   if (!device_open_)
     return (false);
@@ -493,8 +492,19 @@ bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud
     // Get info about the computed point map and copy it into a std::vector
     double timestamp;
     std::vector<float> pointMap;
-    int width, height;
     camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);  // Get raw image timestamp
+
+    int width, height, channels, bpe;
+    bool isFlt;
+        
+    camera_[itmImages][itmDisparityMap].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+    image.header.stamp = getPCLStamp (timestamp);
+    image.width = width;
+    image.height = height;
+    image.data.resize (width * height * sizeof(float));
+    image.encoding = getOpenCVType (channels, bpe, isFlt);
+    camera_[itmImages][itmDisparityMap].getBinaryData (image.data.data (), image.data.size (), 0, 0);
+
     camera_[itmImages][itmPointMap].getBinaryDataInfo (&width, &height, 0, 0, 0, 0);
     camera_[itmImages][itmPointMap].getBinaryData (pointMap, 0);
     // Copy point cloud and convert in meters
@@ -544,7 +554,7 @@ bool pcl::EnsensoGrabber::triggerStereoImage ()
 }
 
 
-bool pcl::EnsensoGrabber::grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud)
+bool pcl::EnsensoGrabber::grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud, pcl::PCLImage& image)
 {
   if (!device_open_)
     return (false);
@@ -561,10 +571,24 @@ bool pcl::EnsensoGrabber::grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud
     // Get info about the computed point map and copy it into a std::vector
     double timestamp;
     std::vector<float> pointMap;
-    int width, height;
+
+    int width, height, channels, bpe;
+    bool isFlt;
+          
+          
     camera_[itmImages][itmRaw][itmLeft].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);  // Get raw image timestamp
+
+    camera_[itmImages][itmDisparityMap].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+    image.header.stamp = getPCLStamp (timestamp);
+    image.width = width;
+    image.height = height;
+    image.data.resize (width * height * sizeof(float));
+    image.encoding = getOpenCVType (channels, bpe, isFlt);
+    camera_[itmImages][itmDisparityMap].getBinaryData (image.data.data (), image.data.size (), 0, 0);
+
     camera_[itmImages][itmPointMap].getBinaryDataInfo (&width, &height, 0, 0, 0, 0);
     camera_[itmImages][itmPointMap].getBinaryData (pointMap, 0);
+    
     // Copy point cloud and convert in meters
     cloud.header.stamp = getPCLStamp (timestamp);
     cloud.resize (height * width);
@@ -2053,7 +2077,8 @@ void pcl::EnsensoGrabber::processPoints ()
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
         boost::shared_ptr<PairOfImages> rectifiedimages (new PairOfImages);
-
+        boost::shared_ptr<pcl::PCLImage> disparityImage (new pcl::PCLImage);
+        
         int width, height, channels, bpe;
         bool isFlt;
         double timestamp;
@@ -2094,8 +2119,16 @@ void pcl::EnsensoGrabber::processPoints ()
             cloud->points[i / 3].y = pointMap[i + 1] / 1000.0;
             cloud->points[i / 3].z = pointMap[i + 2] / 1000.0;
           }
-    
-          point_cloud_images_signal_->operator () (cloud, rectifiedimages);
+
+          camera_[itmImages][itmDisparityMap].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+          disparityImage->header.stamp = getPCLStamp (timestamp);
+          disparityImage->width = width;
+          disparityImage->height = height;
+          disparityImage->data.resize (width * height * sizeof(float));
+          disparityImage->encoding = getOpenCVType (channels, bpe, isFlt);
+          camera_[itmImages][itmDisparityMap].getBinaryData (disparityImage->data.data (), disparityImage->data.size (), 0, 0);
+          
+          point_cloud_images_signal_->operator () (cloud, rectifiedimages, disparityImage);
         }
         
         fps_mutex_.lock ();

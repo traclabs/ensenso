@@ -77,6 +77,7 @@ class EnsensoNode
     image_transport::Publisher        mono_rectified_pub_;
     image_transport::Publisher        l_rectified_pub_;
     image_transport::Publisher        r_rectified_pub_;
+    image_transport::Publisher        disparity_pub_;
     // Point cloud
     bool                              point_cloud_;
     ros::Publisher                    cloud_pub_;
@@ -140,6 +141,7 @@ class EnsensoNode
       r_raw_pub_ = it.advertiseCamera("right/image_raw", 1);
       l_rectified_pub_ = it.advertise("left/image_rect", 1);
       r_rectified_pub_ = it.advertise("right/image_rect", 1);
+      r_rectified_pub_ = it.advertise("disparity_image", 1);
 
       //      image_transport::ImageTransport it_mono(nh_);
       mono_raw_pub_ = it.advertiseCamera("/ueye/image_raw", 1);
@@ -224,7 +226,8 @@ class EnsensoNode
       pc_camera_configuration=false;
 
       pcl::PointCloud<pcl::PointXYZ> pc;
-      ensenso_ptr_->grabSingleCloud(pc);
+      pcl::PCLImage disp_img;
+      ensenso_ptr_->grabSingleCloud(pc, disp_img);
       pcl::PCLImage img;
       ensenso_ptr_->grabSingleMono(img);
       
@@ -505,7 +508,8 @@ class EnsensoNode
       {
         boost::function<void(
           const boost::shared_ptr<PointCloudXYZ>&, 
-          const boost::shared_ptr<PairOfImages>&)> f = boost::bind (&EnsensoNode::grabberCallback, this, _1, _2);
+          const boost::shared_ptr<PairOfImages>&,
+          const boost::shared_ptr<pcl::PCLImage>&)> f = boost::bind (&EnsensoNode::grabberCallback, this, _1, _2, _3);
         connection_ = ensenso_ptr_->registerCallback(f);
       }
       if (req.images)
@@ -692,7 +696,8 @@ class EnsensoNode
     {
       ros::Time  start = ros::Time::now();
       pcl::PointCloud<pcl::PointXYZ> pc;
-
+      pcl::PCLImage disp_image;
+      
       bool was_running = ensenso_ptr_->isRunning();
       if (was_running)
         ensenso_ptr_->stop();
@@ -706,12 +711,15 @@ class EnsensoNode
         pc_camera_configuration = true;
       }
       
-      res.success = ensenso_ptr_->grabSingleCloud(pc);
+      res.success = ensenso_ptr_->grabSingleCloud(pc, disp_image);
 
       if (res.success) {
         pc.header.frame_id = camera_frame_id_;
         pcl::toROSMsg(pc, res.cloud);
         cloud_pub_.publish(res.cloud);
+
+        res.disparity_image = *toImageMsg(disp_image);
+        disparity_pub_.publish(res.disparity_image);
       }
       res.time = (ros::Time::now()-start).toSec();
       
@@ -746,12 +754,17 @@ class EnsensoNode
       ros::Time  start = ros::Time::now();
 
       pcl::PointCloud<pcl::PointXYZ> pc;
-      res.success = ensenso_ptr_->grabTriggeredPC(pc);
+      pcl::PCLImage disp_img;
+      res.success = ensenso_ptr_->grabTriggeredPC(pc, disp_img);
 
       if (res.success) {
         pc.header.frame_id = camera_frame_id_;
         pcl::toROSMsg(pc, res.cloud);
         cloud_pub_.publish(res.cloud);
+
+        res.disparity_image = *toImageMsg(disp_img);
+        disparity_pub_.publish(res.disparity_image);
+       
       }
       res.time = (ros::Time::now()-start).toSec();
       
@@ -830,7 +843,8 @@ class EnsensoNode
 
 
     void grabberCallback( const boost::shared_ptr<PointCloudXYZ>& cloud,
-                          const boost::shared_ptr<PairOfImages>& rectifiedimages)
+                          const boost::shared_ptr<PairOfImages>& rectifiedimages,
+                          const boost::shared_ptr<pcl::PCLImage>& disparityImage)
     {
       // Get cameras info
       sensor_msgs::CameraInfo linfo, rinfo;
@@ -855,6 +869,10 @@ class EnsensoNode
       sensor_msgs::PointCloud2 cloud_msg;
       pcl::toROSMsg(*cloud, cloud_msg);
       cloud_pub_.publish(cloud_msg);
+
+      img = *toImageMsg(*disparityImage);
+      disparity_pub_.publish(img);
+      
     }
 
   
@@ -868,6 +886,11 @@ class EnsensoNode
         type = CV_8UC3;
         encoding = "bgr8";
       }
+      else if (pcl_image.encoding == "CV_16UC1") {
+        type = CV_16UC1;
+        encoding = "mono16";
+      }
+      
       cv::Mat image_mat(pcl_image.height, pcl_image.width, type, image_array);
       cv::Mat new_image;
       std_msgs::Header header;

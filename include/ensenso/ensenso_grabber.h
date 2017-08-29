@@ -49,7 +49,8 @@ public:
 
     typedef void
     (sig_cb_ensenso_point_cloud_images)(const pcl::PointCloud<pcl::PointXYZ>::Ptr &,
-                                        const boost::shared_ptr<PairOfImages> &);
+                                        const boost::shared_ptr<PairOfImages> &,
+                                        const boost::shared_ptr<pcl::PCLImage> &);
 
     typedef void
       (sig_cb_mono_images)(const boost::shared_ptr<pcl::PCLImage> &,
@@ -157,10 +158,10 @@ public:
      * @return True if successful, false otherwise
      * @warning A device must be opened and not running */
     bool
-    grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud);
+      grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud, pcl::PCLImage& img);
 
     bool
-    grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud);
+      grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud, pcl::PCLImage& img);
 
     bool
     triggerStereoImage ();
