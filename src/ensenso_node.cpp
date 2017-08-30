@@ -141,7 +141,7 @@ class EnsensoNode
       r_raw_pub_ = it.advertiseCamera("right/image_raw", 1);
       l_rectified_pub_ = it.advertise("left/image_rect", 1);
       r_rectified_pub_ = it.advertise("right/image_rect", 1);
-      r_rectified_pub_ = it.advertise("disparity_image", 1);
+      disparity_pub_ = it.advertise("disparity_image", 1);
 
       //      image_transport::ImageTransport it_mono(nh_);
       mono_raw_pub_ = it.advertiseCamera("/ueye/image_raw", 1);
@@ -710,10 +710,12 @@ class EnsensoNode
         }
         pc_camera_configuration = true;
       }
-      
+
+      ROS_INFO_STREAM("Grabbing Ensenso points");
       res.success = ensenso_ptr_->grabSingleCloud(pc, disp_image);
 
       if (res.success) {
+        ROS_INFO_STREAM("Publishing Ensenso points");
         pc.header.frame_id = camera_frame_id_;
         pcl::toROSMsg(pc, res.cloud);
         cloud_pub_.publish(res.cloud);
@@ -721,6 +723,8 @@ class EnsensoNode
         res.disparity_image = *toImageMsg(disp_image);
         disparity_pub_.publish(res.disparity_image);
       }
+      else
+        ROS_ERROR_STREAM("Grabbing Ensenso points failed");
       res.time = (ros::Time::now()-start).toSec();
       
       return true;
@@ -886,9 +890,9 @@ class EnsensoNode
         type = CV_8UC3;
         encoding = "bgr8";
       }
-      else if (pcl_image.encoding == "CV_16UC1") {
-        type = CV_16UC1;
-        encoding = "mono16";
+      else if (pcl_image.encoding == "CV_16SC1") {
+        type = CV_16SC1;
+        encoding = "mono16";        
       }
       
       cv::Mat image_mat(pcl_image.height, pcl_image.width, type, image_array);
@@ -897,7 +901,27 @@ class EnsensoNode
       header.frame_id = "";
       pcl_conversions::fromPCL(pcl_image.header.stamp,header.stamp);
       //      cv::flip(image_mat, new_image, -1);
-      image_mat.copyTo(new_image);
+      //      image_mat.copyTo(new_image);
+      if (pcl_image.encoding == "CV_16SC1") {
+        //        cv::FileStorage file("pat.xml", cv::FileStorage::WRITE);
+       
+        // Write to file!
+
+        //        file.release();
+        new_image = image_mat / 16 + 20;
+        double min, max;
+        cv::minMaxLoc(new_image, &min, &max);
+        
+        new_image = new_image * (255.0/max);
+          
+        new_image.convertTo(new_image, CV_8UC1);
+        cv::bitwise_not(new_image,new_image);
+        // file << "disparity" << new_image;
+        // file.release();
+        encoding = "mono8";
+      }
+      else
+        image_mat.copyTo(new_image);
       return cv_bridge::CvImage(header, encoding, new_image).toImageMsg();
     }
 };

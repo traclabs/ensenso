@@ -502,7 +502,7 @@ bool pcl::EnsensoGrabber::grabSingleCloud (pcl::PointCloud<pcl::PointXYZ> &cloud
     image.width = width;
     image.height = height;
     image.data.resize (width * height * sizeof(float));
-    image.encoding = getOpenCVType (channels, bpe, isFlt);
+    image.encoding = "CV_16SC1"; //getOpenCVType (channels, bpe, isFlt);
     camera_[itmImages][itmDisparityMap].getBinaryData (image.data.data (), image.data.size (), 0, 0);
 
     camera_[itmImages][itmPointMap].getBinaryDataInfo (&width, &height, 0, 0, 0, 0);
@@ -583,7 +583,7 @@ bool pcl::EnsensoGrabber::grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud
     image.width = width;
     image.height = height;
     image.data.resize (width * height * sizeof(float));
-    image.encoding = getOpenCVType (channels, bpe, isFlt);
+    image.encoding = "CV_16SC1"; //getOpenCVType (channels, bpe, isFlt);
     camera_[itmImages][itmDisparityMap].getBinaryData (image.data.data (), image.data.size (), 0, 0);
 
     camera_[itmImages][itmPointMap].getBinaryDataInfo (&width, &height, 0, 0, 0, 0);
@@ -1619,21 +1619,21 @@ bool pcl::EnsensoGrabber::getCameraInfo(std::string cam, sensor_msgs::CameraInfo
   try
   {
 
-    double theta = camera_[itmLink][itmRotation][itmAngle].asDouble();
-    double x = camera_[itmLink][itmRotation][itmAxis][0].asDouble();
-    double y = camera_[itmLink][itmRotation][itmAxis][1].asDouble();
-    double z = camera_[itmLink][itmRotation][itmAxis][2].asDouble();
+    double theta = 0;//camera_[itmLink][itmRotation][itmAngle].asDouble();
+    double x = 0;//camera_[itmLink][itmRotation][itmAxis][0].asDouble();
+    double y = 0;//camera_[itmLink][itmRotation][itmAxis][1].asDouble();
+    double z = 0;//camera_[itmLink][itmRotation][itmAxis][2].asDouble();
     // Translation
-    double trans_x = camera_[itmLink][itmTranslation][0].asDouble() /1000.0;
-    double trans_y = camera_[itmLink][itmTranslation][1].asDouble() / 1000.0;
-    double trans_z = camera_[itmLink][itmTranslation][2].asDouble() / 1000.0;
+    double trans_x = 0;//camera_[itmLink][itmTranslation][0].asDouble() /1000.0;
+    double trans_y = 0;//camera_[itmLink][itmTranslation][1].asDouble() / 1000.0;
+    double trans_z = 0;//camera_[itmLink][itmTranslation][2].asDouble() / 1000.0;
 
-    std::string json;
-    if (!angleAxisTransformationToJson(trans_x,trans_y,trans_z,x,y,z,theta,json))
-      return false;
+    // std::string json;
+    // if (!angleAxisTransformationToJson(trans_x,trans_y,trans_z,x,y,z,theta,json))
+    //   return false;
 
-    if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, x, y, z))
-      return false;
+    // if (!jsonTransformationToEulerAngles(json, trans_x, trans_y, trans_z, x, y, z))
+    //   return false;
 
     ROS_INFO_STREAM_THROTTLE(10,"Link offset from "<<serial_<<" to "<<camera_[itmLink][itmTarget].asString()<<": "<<trans_x<<" "<<trans_y<<" "<<trans_z<<" "<<x<<" "<<y<<" "<<z);
 
@@ -2125,7 +2125,7 @@ void pcl::EnsensoGrabber::processPoints ()
           disparityImage->width = width;
           disparityImage->height = height;
           disparityImage->data.resize (width * height * sizeof(float));
-          disparityImage->encoding = getOpenCVType (channels, bpe, isFlt);
+          disparityImage->encoding = "CV_16SC1"; //getOpenCVType (channels, bpe, isFlt);
           camera_[itmImages][itmDisparityMap].getBinaryData (disparityImage->data.data (), disparityImage->data.size (), 0, 0);
           
           point_cloud_images_signal_->operator () (cloud, rectifiedimages, disparityImage);
