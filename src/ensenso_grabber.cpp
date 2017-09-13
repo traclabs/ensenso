@@ -11,15 +11,14 @@
 #include "ensenso/ensenso_grabber.h"
 
 void ensensoExceptionHandling (const NxLibException &ex,
-                 std::string func_nam)
+                               std::string func_nam)
 {
-  PCL_ERROR ("%s: NxLib error %s (%d) occurred while accessing item %s.\n", func_nam.c_str (), ex.getErrorText ().c_str (), ex.getErrorCode (),
-         ex.getItemPath ().c_str ());
+  PCL_ERROR ("%s: NxLib error %s (%d) occurred while accessing item %s.\n", func_nam.c_str (), ex.getErrorText ().c_str (), ex.getErrorCode (), ex.getItemPath ().c_str ());
   if (ex.getErrorCode () == NxLibExecutionFailed)
-  {
-    NxLibCommand cmd ("");
-    PCL_WARN ("\n%s\n", cmd.result ().asJson (true, 4, false).c_str ());
-  }
+    {
+      NxLibCommand cmd ("");
+      PCL_WARN ("\n%s\n", cmd.result ().asJson (true, 4, false).c_str ());
+    }
 }
 
 
@@ -434,41 +433,44 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
   //  if (running_)
   //    return (false);
 
-  try
-  {
-    
-    NxLibCommand capture(cmdCapture);
-    capture.parameters ()[itmCameras] = mono_serial_;
-    capture.parameters()[itmTimeout] = 3000;
-    capture.execute ();
-
-    
-    NxLibCommand rect(cmdRectifyImages);
-    rect.parameters ()[itmCameras] = mono_serial_;
-    rect.execute ();
-
-    
-    int width, height, channels, bpe;
-    bool isFlt;
-          
-    double timestamp;
-    mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);          
-    mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
-    image.header.stamp = getPCLStamp (timestamp);
-    image.width = width;
-    image.height = height;
-    image.data.resize (width * height * sizeof(float));
-    image.encoding = getOpenCVType (channels, bpe, isFlt);
-          
-    mono_camera_[itmImages][itmRectified].getBinaryData (image.data.data (), image.data.size (), 0, 0);
-    
-    return (true);
+  
+  for (uint i=0; i<3; i++) {
+    try
+      {
+        
+        NxLibCommand capture(cmdCapture);
+        capture.parameters ()[itmCameras] = mono_serial_;
+        capture.parameters()[itmTimeout] = 3000;
+        capture.execute ();
+        
+        
+        NxLibCommand rect(cmdRectifyImages);
+        rect.parameters ()[itmCameras] = mono_serial_;
+        rect.execute ();
+        
+        
+        int width, height, channels, bpe;
+        bool isFlt;
+        
+        double timestamp;
+        mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);          
+        mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+        image.header.stamp = getPCLStamp (timestamp);
+        image.width = width;
+        image.height = height;
+        image.data.resize (width * height * sizeof(float));
+        image.encoding = getOpenCVType (channels, bpe, isFlt);
+        
+        mono_camera_[itmImages][itmRectified].getBinaryData (image.data.data (), image.data.size (), 0, 0);
+        
+        return true;
+      }
+    catch (NxLibException &ex)
+      {
+        ensensoExceptionHandling (ex, "grabSingleMono");
+      }
   }
-  catch (NxLibException &ex)
-  {
-    ensensoExceptionHandling (ex, "grabSingleMono");
-    return (false);
-  }
+  return false;
 }
 
 
