@@ -742,13 +742,16 @@ class EnsensoNode
       if (!pc_camera_configuration) {
         if (!ensenso_ptr_->configureCapture()) {
           res.success=false;
+          ROS_ERROR_STREAM("Could not get Ensenso into correct configuration");
           return true;
         }
         pc_camera_configuration = true;
       }
       
       res.success = ensenso_ptr_->triggerStereoImage();
-      
+      if (!res.success)
+          ROS_ERROR_STREAM("Ensenso Stereo Trigger failed");
+        
       return true;
     }
 
