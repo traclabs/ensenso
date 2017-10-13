@@ -737,7 +737,7 @@ class EnsensoNode
       bool was_running = ensenso_ptr_->isRunning();
       if (was_running)
         ensenso_ptr_->stop();
-
+      
       
       if (!pc_camera_configuration) {
         if (!ensenso_ptr_->configureCapture()) {
@@ -751,7 +751,9 @@ class EnsensoNode
       res.success = ensenso_ptr_->triggerStereoImage();
       if (!res.success)
           ROS_ERROR_STREAM("Ensenso Stereo Trigger failed");
-        
+      else
+        ROS_INFO_STREAM("PC triggered");
+      
       return true;
     }
 
@@ -796,14 +798,18 @@ class EnsensoNode
         }
         mono_camera_configuration = true;
       }
-      
-      res.success = ensenso_ptr_->grabSingleMono(rectimage);
+
+      do {
+        res.success = ensenso_ptr_->grabSingleMono(rectimage);
+      } while (!res.success && ros::Time::now()-start < ros::Duration(10));
       
       if (res.success) {
         
         res.image = *toImageMsg(rectimage);
         mono_rectified_pub_.publish(res.image);
       }
+      else
+        ROS_ERROR("Failed to grab mono image");
       res.time = (ros::Time::now()-start).toSec();
       return true;
     }

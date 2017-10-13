@@ -467,6 +467,7 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
       }
     catch (NxLibException &ex)
       {
+        ROS_ERROR_STREAM("Ensenso: Grab Single Mono threw exception: "<<ex.getErrorText());
         ensensoExceptionHandling (ex, "grabSingleMono");
       }
   }
