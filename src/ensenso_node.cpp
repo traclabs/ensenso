@@ -787,6 +787,8 @@ class EnsensoNode
 
       pcl::PCLImage rectimage;
 
+      ROS_WARN_STREAM("Request to grab image");
+      
       bool was_running = ensenso_ptr_->mono_isRunning();
       if (was_running)
         ensenso_ptr_->mono_stop();
@@ -799,9 +801,14 @@ class EnsensoNode
         mono_camera_configuration = true;
       }
 
+      
       do {
+        ROS_WARN_STREAM("Grabbing image");
         res.success = ensenso_ptr_->grabSingleMono(rectimage);
-      } while (!res.success && ros::Time::now()-start < ros::Duration(10));
+        if (res.success)
+          break;
+        ros::Duration(0.1).sleep();
+      } while (ros::Time::now()-start < ros::Duration(10));
       
       if (res.success) {
         

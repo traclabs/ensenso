@@ -434,43 +434,42 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
   //    return (false);
 
   
-  for (uint i=0; i<3; i++) {
-    try
-      {
-        
-        NxLibCommand capture(cmdCapture);
-        capture.parameters ()[itmCameras] = mono_serial_;
-        capture.parameters()[itmTimeout] = 3000;
-        capture.execute ();
-        
-        
-        NxLibCommand rect(cmdRectifyImages);
-        rect.parameters ()[itmCameras] = mono_serial_;
-        rect.execute ();
-        
-        
-        int width, height, channels, bpe;
-        bool isFlt;
-        
-        double timestamp;
-        mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);          
-        mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
-        image.header.stamp = getPCLStamp (timestamp);
-        image.width = width;
-        image.height = height;
-        image.data.resize (width * height * sizeof(float));
-        image.encoding = getOpenCVType (channels, bpe, isFlt);
-        
-        mono_camera_[itmImages][itmRectified].getBinaryData (image.data.data (), image.data.size (), 0, 0);
-        
-        return true;
-      }
-    catch (NxLibException &ex)
-      {
-        ROS_ERROR_STREAM("Ensenso: Grab Single Mono threw exception: "<<ex.getErrorText());
-        ensensoExceptionHandling (ex, "grabSingleMono");
-      }
-  }
+  try
+    {
+      
+      NxLibCommand capture(cmdCapture);
+      capture.parameters ()[itmCameras] = mono_serial_;
+      capture.parameters()[itmTimeout] = 3000;
+      capture.execute ();
+      
+      
+      NxLibCommand rect(cmdRectifyImages);
+      rect.parameters ()[itmCameras] = mono_serial_;
+      rect.execute ();
+      
+      
+      int width, height, channels, bpe;
+      bool isFlt;
+      
+      double timestamp;
+      mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);          
+      mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      image.header.stamp = getPCLStamp (timestamp);
+      image.width = width;
+      image.height = height;
+      image.data.resize (width * height * sizeof(float));
+      image.encoding = getOpenCVType (channels, bpe, isFlt);
+      
+      mono_camera_[itmImages][itmRectified].getBinaryData (image.data.data (), image.data.size (), 0, 0);
+      
+      return true;
+    }
+  catch (NxLibException &ex)
+    {
+      ROS_ERROR_STREAM("Ensenso: Grab Single Mono threw exception: "<<ex.getErrorText());
+      ensensoExceptionHandling (ex, "grabSingleMono");
+    }
+  
   return false;
 }
 
