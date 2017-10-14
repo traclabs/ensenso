@@ -437,13 +437,13 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
   try
     {
       
-      NxLibCommand capture(cmdCapture);
+      NxLibCommand capture(cmdCapture,"mono");
       capture.parameters ()[itmCameras] = mono_serial_;
       capture.parameters()[itmTimeout] = 3000;
       capture.execute ();
       
       
-      NxLibCommand rect(cmdRectifyImages);
+      NxLibCommand rect(cmdRectifyImages,"mono");
       rect.parameters ()[itmCameras] = mono_serial_;
       rect.execute ();
       
@@ -543,7 +543,7 @@ bool pcl::EnsensoGrabber::triggerStereoImage ()
 
   try
   {
-    NxLibCommand capture(cmdCapture);
+    NxLibCommand capture(cmdCapture,"stereo");
     capture.parameters ()[itmCameras] = serial_;
     capture.execute ();
   }
@@ -567,9 +567,11 @@ bool pcl::EnsensoGrabber::grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud
   try
   {
     // Stereo matching task
-    NxLibCommand (cmdComputeDisparityMap).execute ();
+    NxLibCommand dispMap(cmdComputeDisparityMap, "stereo");
+    dispMap.execute ();
     // Convert disparity map into XYZ data for each pixel
-    NxLibCommand (cmdComputePointMap).execute ();
+    NxLibCommand pntMap(cmdComputePointMap,"stereo");
+    pntMap.execute ();
     // Get info about the computed point map and copy it into a std::vector
     double timestamp;
     std::vector<float> pointMap;
