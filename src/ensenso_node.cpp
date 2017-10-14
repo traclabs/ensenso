@@ -96,13 +96,13 @@ class EnsensoNode
 
   bool pc_camera_configuration, mono_camera_configuration;
   bool sim;
+  std::string serial, mono_serial;
   
   public:
      EnsensoNode(): 
       nh_private_("~")
     {
       // Read parameters
-      std::string serial, mono_serial;
       pc_camera_configuration = mono_camera_configuration = false;
       sim = false;
       
@@ -801,14 +801,16 @@ class EnsensoNode
         mono_camera_configuration = true;
       }
 
-      
+      uint count =0;
       do {
         ROS_WARN_STREAM("Grabbing image");
+        count++;
         res.success = ensenso_ptr_->grabSingleMono(rectimage);
-        if (res.success)
+        if (res.success || count==3)
           break;
-        ros::Duration(0.1).sleep();
-      } while (ros::Time::now()-start < ros::Duration(10));
+        ensenso_ptr_->mono_closeDevice();
+        ensenso_ptr_->mono_openDevice(mono_serial,false);
+      } while (count <3);// || ros::Time::now()-start < ros::Duration(10));
       
       if (res.success) {
         

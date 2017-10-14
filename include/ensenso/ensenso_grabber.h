@@ -73,7 +73,8 @@ public:
      * @return True if successful, false otherwise */
     bool openDevice (std::string serial_no);
 
-    bool mono_openDevice (std::string serial_no);
+    bool mono_openDevice (std::string serial_no, bool retry=true);
+    void mono_closeDevice ();
 
     /** @brief Closes the Ensenso device
      * @return True if successful, false otherwise */

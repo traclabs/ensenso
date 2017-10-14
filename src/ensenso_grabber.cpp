@@ -13,11 +13,11 @@
 void ensensoExceptionHandling (const NxLibException &ex,
                                std::string func_nam)
 {
-  PCL_ERROR ("%s: NxLib error %s (%d) occurred while accessing item %s.\n", func_nam.c_str (), ex.getErrorText ().c_str (), ex.getErrorCode (), ex.getItemPath ().c_str ());
+  ROS_ERROR ("%s: NxLib error %s (%d) occurred while accessing item %s.", func_nam.c_str (), ex.getErrorText ().c_str (), ex.getErrorCode (), ex.getItemPath ().c_str ());
   if (ex.getErrorCode () == NxLibExecutionFailed)
     {
       NxLibCommand cmd ("");
-      PCL_WARN ("\n%s\n", cmd.result ().asJson (true, 4, false).c_str ());
+      ROS_WARN ("%s", cmd.result ().asJson (true, 4, false).c_str ());
     }
 }
 
@@ -34,7 +34,7 @@ pcl::EnsensoGrabber::EnsensoGrabber () :
 
   mono_images_signal_ = createSignal<sig_cb_mono_images> ();
   
-  PCL_INFO ("Initialising nxLib\n");
+  ROS_INFO ("Initialising nxLib\n");
 
   try
   {
@@ -80,16 +80,16 @@ int pcl::EnsensoGrabber::enumDevices () const
     camera_count = cams.count ();
 
     // Print information for all cameras in the tree
-    PCL_INFO ("Number of connected cameras: %d\n", camera_count);
-    PCL_INFO ("Serial No    Model   Status\n");
+    ROS_INFO ("Number of connected cameras: %d\n", camera_count);
+    ROS_INFO ("Serial No    Model   Status\n");
 
     for (int n = 0; n < cams.count (); ++n)
     {
-      PCL_INFO ("%s   %s   %s\n", cams[n][itmSerialNumber].asString ().c_str (),
+      ROS_INFO ("%s   %s   %s\n", cams[n][itmSerialNumber].asString ().c_str (),
             cams[n][itmModelName].asString ().c_str (),
             cams[n][itmStatus].asString ().c_str ());
     }
-    PCL_INFO ("\n");
+    ROS_INFO ("\n");
   }
   catch (NxLibException &ex)
   {
@@ -104,7 +104,7 @@ bool pcl::EnsensoGrabber::openDevice (std::string serial_no)
    ROS_ERROR("Cannot open multiple devices!");
    return false;
   }
-  PCL_INFO ("Opening Ensenso stereo camera S/N: %s\n", serial_no.c_str());
+  ROS_INFO ("Opening Ensenso stereo camera S/N: %s\n", serial_no.c_str());
 
   ros::Time start_time = ros::Time::now();
   bool isOpen = false;
@@ -148,13 +148,13 @@ bool pcl::EnsensoGrabber::openDevice (std::string serial_no)
   return (true);
 }
 
-bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no)
+bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no, bool retry)
 {
   if (mono_device_open_) {
    ROS_ERROR("Cannot open multiple devices!");
    return false;
   }
-  PCL_INFO ("Opening Ueye Monocular camera S/N: %s\n", serial_no.c_str());
+  ROS_INFO ("Opening Ueye Monocular camera S/N: %s\n", serial_no.c_str());
 
   ros::Time start_time = ros::Time::now();
   bool isOpen = false;
@@ -166,11 +166,17 @@ bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no)
         
       if (!mono_camera_.exists () || mono_camera_[itmType] != valMonocular)
         {
-          ROS_FATAL_STREAM("Monocular camera "<<serial_no<<" not found on system");
+          if (!retry) 
+            ROS_ERROR_STREAM("Monocular camera "<<serial_no<<" not found on system");
+          else
+            ROS_FATAL_STREAM("Monocular camera "<<serial_no<<" not found on system");
+          return false;
         }
 
       while (!mono_camera_[itmStatus][itmAvailable].asBool()) {
-        ROS_WARN_STREAM_THROTTLE(1,"Camera "<<serial_no<<" exists but is not available.  Trying again.");
+        ROS_WARN_STREAM_THROTTLE(1,"Camera "<<serial_no<<" exists but is not yet available.");  
+        if (!retry)
+          return false;
       }
       
       do {
@@ -180,8 +186,11 @@ bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no)
         open.execute ();
         mono_serial_=serial_no;
         isOpen=mono_camera_[itmStatus][itmOpen].asBool();
-        if (!isOpen)
-          ROS_WARN_STREAM_THROTTLE(1,"Having trouble opening camera "<<serial_no<<".  Trying again.");
+        if (!isOpen) {
+          ROS_WARN_STREAM_THROTTLE(1,"Having trouble opening camera "<<serial_no<< (retry ? ".  Trying again." : "."));
+          if (!retry)
+            return false;
+        }
       } while (!isOpen);
     }
   catch (NxLibException &ex)
@@ -199,12 +208,26 @@ bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no)
   return (true);
 }
 
+void pcl::EnsensoGrabber::mono_closeDevice(){
+  try {
+    NxLibCommand close(cmdClose);
+    close.parameters()[itmCameras] = mono_serial_;
+    close.execute ();
+    ROS_WARN_STREAM("Closed mono camera");
+  }
+  catch (NxLibException &ex)
+    {
+      ensensoExceptionHandling (ex, "mono_closeDevice");
+    }
+  mono_device_open_ = false;
+
+}
 
 bool pcl::EnsensoGrabber::closeDevices ()
 {
   stop ();
   mono_stop();
-  PCL_INFO ("Closing all nxLibrary cameras\n");
+  ROS_INFO ("Closing all nxLibrary cameras\n");
 
   try
   {
@@ -427,8 +450,10 @@ bool pcl::EnsensoGrabber::mono_configureCapture(
 
 bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
 {
-  if (!mono_device_open_)
+  if (!mono_device_open_) {
+    ROS_WARN_STREAM("grabSingleMono: Mono camera not yet open");
     return (false);
+  }
 
   //  if (running_)
   //    return (false);
@@ -466,7 +491,6 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
     }
   catch (NxLibException &ex)
     {
-      ROS_ERROR_STREAM("Ensenso: Grab Single Mono threw exception: "<<ex.getErrorText());
       ensensoExceptionHandling (ex, "grabSingleMono");
     }
   
@@ -1030,7 +1054,7 @@ bool pcl::EnsensoGrabber::computeCalibrationMatrix (const std::vector<Eigen::Aff
                           ) 
 {
   if ( (*root_)[itmVersion][itmMajor] < 2 && (*root_)[itmVersion][itmMinor] < 3)
-    PCL_WARN ("EnsensoSDK 1.3.x fixes bugs into extrinsic calibration matrix optimization, please update your SDK!\n"
+    ROS_WARN ("EnsensoSDK 1.3.x fixes bugs into extrinsic calibration matrix optimization, please update your SDK!\n"
           "http://www.ensenso.de/support/sdk-download/\n");
 
   int num_items = (*root_)[itmParameters][itmPatternCount].asInt ();
