@@ -210,7 +210,9 @@ bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no, bool retry)
 
 void pcl::EnsensoGrabber::mono_closeDevice(){
   if (mono_camera_.exists () && mono_camera_[itmStatus][itmOpen].asBool()) {
+
     ROS_WARN_STREAM("Camera "<<mono_serial_<<" exists and is open, so closing to try and reopen");
+
     try {
       NxLibCommand close(cmdClose);
       close.parameters()[itmCameras] = mono_serial_;
@@ -221,6 +223,9 @@ void pcl::EnsensoGrabber::mono_closeDevice(){
       {
         ensensoExceptionHandling (ex, "mono_closeDevice");
       }
+  }
+  else ROS_WARN_STREAM("Camera "<<mono_serial_<<" wasn't open so just set to closed");
+
   mono_device_open_ = false;
 
 }
