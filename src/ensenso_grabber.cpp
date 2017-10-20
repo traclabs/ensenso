@@ -209,16 +209,18 @@ bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no, bool retry)
 }
 
 void pcl::EnsensoGrabber::mono_closeDevice(){
-  try {
-    NxLibCommand close(cmdClose);
-    close.parameters()[itmCameras] = mono_serial_;
-    close.execute ();
-    ROS_WARN_STREAM("Closed mono camera");
-  }
-  catch (NxLibException &ex)
-    {
-      ensensoExceptionHandling (ex, "mono_closeDevice");
+  if (mono_camera_.exists () && mono_camera_[itmStatus][itmOpen].asBool()) {
+    ROS_WARN_STREAM("Camera "<<mono_serial_<<" exists and is open, so closing to try and reopen");
+    try {
+      NxLibCommand close(cmdClose);
+      close.parameters()[itmCameras] = mono_serial_;
+      close.execute ();
+      ROS_WARN_STREAM("Closed mono camera");
     }
+    catch (NxLibException &ex)
+      {
+        ensensoExceptionHandling (ex, "mono_closeDevice");
+      }
   mono_device_open_ = false;
 
 }
@@ -462,13 +464,13 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
   try
     {
       
-      NxLibCommand capture(cmdCapture,"mono");
+      NxLibCommand capture(cmdCapture);
       capture.parameters ()[itmCameras] = mono_serial_;
       capture.parameters()[itmTimeout] = 3000;
       capture.execute ();
       
       
-      NxLibCommand rect(cmdRectifyImages,"mono");
+      NxLibCommand rect(cmdRectifyImages);
       rect.parameters ()[itmCameras] = mono_serial_;
       rect.execute ();
       
@@ -492,6 +494,7 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
   catch (NxLibException &ex)
     {
       ensensoExceptionHandling (ex, "grabSingleMono");
+      return false;
     }
   
   return false;
@@ -567,7 +570,7 @@ bool pcl::EnsensoGrabber::triggerStereoImage ()
 
   try
   {
-    NxLibCommand capture(cmdCapture,"stereo");
+    NxLibCommand capture(cmdCapture);
     capture.parameters ()[itmCameras] = serial_;
     capture.execute ();
   }
@@ -591,10 +594,10 @@ bool pcl::EnsensoGrabber::grabTriggeredPC (pcl::PointCloud<pcl::PointXYZ> &cloud
   try
   {
     // Stereo matching task
-    NxLibCommand dispMap(cmdComputeDisparityMap, "stereo");
+    NxLibCommand dispMap(cmdComputeDisparityMap);
     dispMap.execute ();
     // Convert disparity map into XYZ data for each pixel
-    NxLibCommand pntMap(cmdComputePointMap,"stereo");
+    NxLibCommand pntMap(cmdComputePointMap);
     pntMap.execute ();
     // Get info about the computed point map and copy it into a std::vector
     double timestamp;

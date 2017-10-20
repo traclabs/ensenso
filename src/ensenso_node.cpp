@@ -801,16 +801,8 @@ class EnsensoNode
         mono_camera_configuration = true;
       }
 
-      uint count =0;
-      do {
-        ROS_WARN_STREAM("Grabbing image");
-        count++;
-        res.success = ensenso_ptr_->grabSingleMono(rectimage);
-        if (res.success || count==3)
-          break;
-        ensenso_ptr_->mono_closeDevice();
-        ensenso_ptr_->mono_openDevice(mono_serial,false);
-      } while (count <3);// || ros::Time::now()-start < ros::Duration(10));
+      ROS_WARN_STREAM("Grabbing image");
+      res.success = ensenso_ptr_->grabSingleMono(rectimage);
       
       if (res.success) {
         
