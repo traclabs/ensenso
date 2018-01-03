@@ -182,7 +182,7 @@ bool pcl::EnsensoGrabber::mono_openDevice (std::string serial_no, bool retry)
       do {
         NxLibCommand open (cmdOpen);
         open.parameters ()[itmCameras] = mono_camera_[itmSerialNumber].asString ();
-        open.parameters ()[itmLoadCalibration] = true;
+        open.parameters ()[itmLoadCalibration] = false;
         open.execute ();
         mono_serial_=serial_no;
         isOpen=mono_camera_[itmStatus][itmOpen].asBool();
@@ -475,24 +475,24 @@ bool pcl::EnsensoGrabber::grabSingleMono (pcl::PCLImage& image)
       capture.execute ();
       
       
-      NxLibCommand rect(cmdRectifyImages);
-      rect.parameters ()[itmCameras] = mono_serial_;
-      rect.execute ();
+      // NxLibCommand rect(cmdRectifyImages);
+      // rect.parameters ()[itmCameras] = mono_serial_;
+      // rect.execute ();
       
       
       int width, height, channels, bpe;
       bool isFlt;
       
       double timestamp;
-      mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);          
-      mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+      mono_camera_[itmImages][itmRaw].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);          
+      mono_camera_[itmImages][itmRaw].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
       image.header.stamp = getPCLStamp (timestamp);
       image.width = width;
       image.height = height;
       image.data.resize (width * height * sizeof(float));
       image.encoding = getOpenCVType (channels, bpe, isFlt);
       
-      mono_camera_[itmImages][itmRectified].getBinaryData (image.data.data (), image.data.size (), 0, 0);
+      mono_camera_[itmImages][itmRaw].getBinaryData (image.data.data (), image.data.size (), 0, 0);
       
       return true;
     }
@@ -2190,7 +2190,7 @@ void pcl::EnsensoGrabber::processPoints ()
 void pcl::EnsensoGrabber::processMono ()
 {
   NxLibCommand capture(cmdCapture, "mono");
-  NxLibCommand rect(cmdRectifyImages, "mono");
+  // NxLibCommand rect(cmdRectifyImages, "mono");
   
   ros::Rate loop_rate(3);
   
@@ -2207,12 +2207,12 @@ void pcl::EnsensoGrabber::processMono ()
           capture.parameters()[itmTimeout] = 3000;
           capture.execute();        
           
-          rect.parameters ()[itmCameras] = mono_serial_;
-          rect.execute ();
+          // rect.parameters ()[itmCameras] = mono_serial_;
+          // rect.execute ();
           
           
           boost::shared_ptr<pcl::PCLImage> rawimage (new pcl::PCLImage);
-          boost::shared_ptr<pcl::PCLImage> rectimage (new pcl::PCLImage);
+          // boost::shared_ptr<pcl::PCLImage> rectimage (new pcl::PCLImage);
           int width, height, channels, bpe;
           bool isFlt;
           
@@ -2228,19 +2228,19 @@ void pcl::EnsensoGrabber::processMono ()
           
           mono_camera_[itmImages][itmRaw].getBinaryData (rawimage->data.data (), rawimage->data.size (), 0, 0);
 
-          mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
+          // mono_camera_[itmImages][itmRectified].getBinaryDataInfo (0, 0, 0, 0, 0, &timestamp);
           
-          mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
-          rectimage->header.stamp = getPCLStamp (timestamp);
-          rectimage->width = width;
-          rectimage->height = height;
-          rectimage->data.resize (width * height * sizeof(float));
-          rectimage->encoding = getOpenCVType (channels, bpe, isFlt);
+          // mono_camera_[itmImages][itmRectified].getBinaryDataInfo (&width, &height, &channels, &bpe, &isFlt, 0);
+          // rectimage->header.stamp = getPCLStamp (timestamp);
+          // rectimage->width = width;
+          // rectimage->height = height;
+          // rectimage->data.resize (width * height * sizeof(float));
+          // rectimage->encoding = getOpenCVType (channels, bpe, isFlt);
           
-          mono_camera_[itmImages][itmRectified].getBinaryData (rectimage->data.data (), rectimage->data.size (), 0, 0);
+          // mono_camera_[itmImages][itmRectified].getBinaryData (rectimage->data.data (), rectimage->data.size (), 0, 0);
 
                     
-          mono_images_signal_->operator () (rawimage,rectimage);
+          mono_images_signal_->operator () (rawimage,rawimage);
         }
     }
     catch (NxLibException &ex)
