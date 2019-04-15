@@ -1212,6 +1212,7 @@ bool pcl::EnsensoGrabber::computeMonoCalibrationMatrix (
       } 
       
     }
+  return false;
 }
 
 
@@ -1344,7 +1345,7 @@ bool pcl::EnsensoGrabber::getCalInfo ()
     std::cerr<< camera_[itmCalibration][itmMonocular][itmRight][itmDistortion][i].asDouble()<<" ";
   std::cerr<<"\n";
 
-  
+  return true;
 }
 
 bool pcl::EnsensoGrabber::checkCalibration (double& max_error) 
@@ -1374,6 +1375,7 @@ bool pcl::EnsensoGrabber::checkCalibration (double& max_error)
     ROS_WARN("checkCalibration Failed");
     return (false);
   }
+  return true;  
 }
 
 
